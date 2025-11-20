@@ -1,24 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { GameEvent } from '@/types/game-data';
-import { parseCSVData, calculateStageStats, findDifficultySpikes, calculateFunnelData, getVoluntaryExitRate, getOverallClearRate } from '@/lib/data-processor';
+import { GameEvent, FilterOptions, StageType } from '@/types/game-data';
+import { parseCSVData, calculateStageStats, findDifficultySpikes, getVoluntaryExitRate, getOverallClearRate, filterEvents, getCountries } from '@/lib/data-processor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, FilterX } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, FilterX, Database } from 'lucide-react';
 import StageOverview from './stage-overview';
 import DifficultyCurve from './difficulty-curve';
 import FunnelAnalysis from './funnel-analysis';
 import StageComparison from './stage-comparison';
 import MetricsCards from './metrics-cards';
 
+interface DataFileInfo {
+  fileName: string;
+  displayName: string;
+  startDate: string;
+  endDate: string;
+  filePath: string;
+}
+
 export default function Dashboard() {
   const [gameData, setGameData] = useState<GameEvent[]>([]);
   const [fileName, setFileName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [excludeVoluntaryExits, setExcludeVoluntaryExits] = useState(false);
+  const [excludeRepeatPlays, setExcludeRepeatPlays] = useState(false);
+  const [stageType, setStageType] = useState<StageType>('all');
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [availableFiles, setAvailableFiles] = useState<DataFileInfo[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string>('');
+
+  // Fetch available data files on mount
+  useEffect(() => {
+    fetch('/api/data-files')
+      .then(res => res.json())
+      .then(data => {
+        if (data.files && data.files.length > 0) {
+          setAvailableFiles(data.files);
+        }
+      })
+      .catch(error => console.error('Error fetching data files:', error));
+  }, []);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -40,6 +66,28 @@ export default function Dashboard() {
         setIsLoading(false);
       }
     });
+  };
+
+  const loadDataFile = (filePath: string, displayName: string) => {
+    setIsLoading(true);
+    fetch(filePath)
+      .then(response => response.text())
+      .then(csvText => {
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const events = parseCSVData(results.data);
+            setGameData(events);
+            setFileName(displayName);
+            setIsLoading(false);
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Error loading data file:', error);
+        setIsLoading(false);
+      });
   };
 
   const loadSampleData = () => {
@@ -73,6 +121,57 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Available Data Files Section */}
+            {availableFiles.length > 0 && (
+              <>
+                <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Database className="w-5 h-5 text-blue-400" />
+                    <h3 className="font-semibold text-white">사용 가능한 데이터</h3>
+                  </div>
+                  <p className="text-sm text-slate-300 mb-3">
+                    {availableFiles.length}개의 데이터 파일이 있습니다
+                  </p>
+                  <Select
+                    value={selectedFile}
+                    onValueChange={(value) => {
+                      setSelectedFile(value);
+                      const file = availableFiles.find(f => f.filePath === value);
+                      if (file) {
+                        loadDataFile(file.filePath, file.displayName);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="데이터 기간 선택..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700 max-h-[300px]">
+                      {availableFiles.map((file) => (
+                        <SelectItem
+                          key={file.filePath}
+                          value={file.filePath}
+                          className="text-white hover:bg-slate-700"
+                        >
+                          📅 {file.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="text-center">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-600"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-slate-800/50 text-slate-400">또는</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-600 rounded-lg p-12 hover:border-slate-500 transition-colors">
               <Upload className="w-16 h-16 text-slate-400 mb-4" />
               <label htmlFor="file-upload" className="cursor-pointer">
@@ -128,14 +227,22 @@ export default function Dashboard() {
     );
   }
 
-  // Filter data based on voluntary exit exclusion
-  const filteredData = excludeVoluntaryExits
-    ? gameData.filter(event => !(event.eventAction === 'fail' && event.customEventProperties.exit_type === 'voluntary_exit'))
-    : gameData;
+  // Get available countries from data
+  const availableCountries = getCountries(gameData);
+
+  // Create filter options
+  const filterOptions: FilterOptions = {
+    excludeVoluntaryExits,
+    excludeRepeatPlays,
+    stageType,
+    selectedCountries
+  };
+
+  // Filter data based on all filter options
+  const filteredData = filterEvents(gameData, filterOptions);
 
   const stageStats = calculateStageStats(filteredData);
   const difficultySpikes = findDifficultySpikes(filteredData);
-  const funnelData = calculateFunnelData(filteredData);
   const overallClearRate = getOverallClearRate(filteredData);
   const voluntaryExitRate = getVoluntaryExitRate(gameData); // Always use full data for this metric
 
@@ -172,10 +279,15 @@ export default function Dashboard() {
 
           {/* Filter Toggle */}
           <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
-            <CardContent className="py-4">
+            <CardContent className="py-4 space-y-4">
+              <div className="flex items-center gap-3 text-white">
+                <FilterX className="w-5 h-5 text-slate-400" />
+                <h3 className="font-semibold">필터 설정</h3>
+              </div>
+
+              {/* Voluntary Exit Filter */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <FilterX className="w-5 h-5 text-slate-400" />
                   <div>
                     <p className="text-sm font-medium text-white">
                       자발적 포기 데이터 제외
@@ -198,9 +310,141 @@ export default function Dashboard() {
                   />
                 </button>
               </div>
-              {excludeVoluntaryExits && (
+
+              {/* Repeat Play Filter */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      반복 플레이 데이터 제외
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      is_repeat_play 데이터를 분석에서 제외합니다
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setExcludeRepeatPlays(!excludeRepeatPlays)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    excludeRepeatPlays ? 'bg-blue-600' : 'bg-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      excludeRepeatPlays ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Stage Type Filter */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-white">
+                    스테이지 타입 필터
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    특정 타입의 스테이지만 표시합니다
+                  </p>
+                </div>
+                <Select value={stageType} onValueChange={(value: StageType) => setStageType(value)}>
+                  <SelectTrigger className="w-[180px] bg-slate-700 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem value="all" className="text-white hover:bg-slate-700">전체 스테이지</SelectItem>
+                    <SelectItem value="normal" className="text-white hover:bg-slate-700">일반 (2001-2999)</SelectItem>
+                    <SelectItem value="elite" className="text-white hover:bg-slate-700">정예 (3001-3999)</SelectItem>
+                    <SelectItem value="luck" className="text-white hover:bg-slate-700">운빨 던전 (4001-4999)</SelectItem>
+                    <SelectItem value="mass" className="text-white hover:bg-slate-700">물량 던전 (5001-5999)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Country Filter */}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-white">
+                    국가 필터
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    특정 국가의 데이터만 분석합니다
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {availableCountries.slice(0, 10).map(country => (
+                    <button
+                      key={country.code}
+                      onClick={() => {
+                        if (selectedCountries.includes(country.code)) {
+                          setSelectedCountries(selectedCountries.filter(c => c !== country.code));
+                        } else {
+                          setSelectedCountries([...selectedCountries, country.code]);
+                        }
+                      }}
+                      className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                        selectedCountries.includes(country.code)
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {country.name} ({country.count})
+                    </button>
+                  ))}
+                  {availableCountries.length > 10 && (
+                    <Select
+                      value=""
+                      onValueChange={(code) => {
+                        if (!selectedCountries.includes(code)) {
+                          setSelectedCountries([...selectedCountries, code]);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[140px] bg-slate-700 border-slate-600 text-white text-xs">
+                        <SelectValue placeholder="더 보기..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-700 max-h-[300px]">
+                        {availableCountries.slice(10).map(country => (
+                          <SelectItem
+                            key={country.code}
+                            value={country.code}
+                            className="text-white hover:bg-slate-700 text-xs"
+                          >
+                            {country.name} ({country.count})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                {selectedCountries.length > 0 && (
+                  <button
+                    onClick={() => setSelectedCountries([])}
+                    className="text-xs text-blue-400 hover:text-blue-300 underline"
+                  >
+                    모든 국가 선택 해제
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Status Message */}
+              {(excludeVoluntaryExits || excludeRepeatPlays || stageType !== 'all' || selectedCountries.length > 0) && (
                 <div className="mt-3 p-2 bg-blue-900/30 border border-blue-700/50 rounded text-xs text-blue-300">
-                  ⓘ 현재 {gameData.filter(e => e.eventAction === 'fail' && e.customEventProperties.exit_type === 'voluntary_exit').length}개의 자발적 포기 데이터가 제외되어 있습니다.
+                  <div className="space-y-1">
+                    <p>ⓘ 필터 적용 중:</p>
+                    {excludeVoluntaryExits && (
+                      <p>• 자발적 포기: {gameData.filter(e => e.eventAction === 'fail' && e.customEventProperties.exit_type === 'voluntary_exit').length}개 제외</p>
+                    )}
+                    {excludeRepeatPlays && (
+                      <p>• 반복 플레이: {gameData.filter(e => e.customEventProperties.is_repeat_play === true).length}개 제외</p>
+                    )}
+                    {stageType !== 'all' && (
+                      <p>• 스테이지 타입: {stageType === 'normal' ? '일반' : stageType === 'elite' ? '정예' : stageType === 'luck' ? '운빨 던전' : '물량 던전'}만 표시</p>
+                    )}
+                    {selectedCountries.length > 0 && (
+                      <p>• 국가: {selectedCountries.map(code => availableCountries.find(c => c.code === code)?.name || code).join(', ')} ({selectedCountries.length}개 국가)</p>
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -253,7 +497,7 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="funnel" className="space-y-4">
-            <FunnelAnalysis funnelData={funnelData} />
+            <FunnelAnalysis events={filteredData} />
           </TabsContent>
 
           <TabsContent value="comparison" className="space-y-4">
