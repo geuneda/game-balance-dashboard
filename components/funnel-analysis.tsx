@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
 import { GameEvent } from '@/types/game-data';
-import { calculateFunnelData, calculateStageSpecificFunnelData, getStageIds } from '@/lib/data-processor';
+import { calculateFunnelData, calculateStageSpecificFunnelData, getStageIds, formatStageId } from '@/lib/data-processor';
 import { Users, TrendingDown, Target } from 'lucide-react';
 
 interface FunnelAnalysisProps {
@@ -70,14 +70,14 @@ export default function FunnelAnalysis({ events }: FunnelAnalysisProps) {
                     value={stageId}
                     className="text-white hover:bg-slate-700"
                   >
-                    스테이지 {stageId}
+                    {formatStageId(stageId)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {selectedStage !== 'all' && (
               <span className="text-xs text-slate-400">
-                스테이지 {selectedStage}의 퍼널 데이터를 표시하고 있습니다
+                {formatStageId(selectedStage)}의 퍼널 데이터를 표시하고 있습니다
               </span>
             )}
           </div>

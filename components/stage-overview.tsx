@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { StageStats } from '@/types/game-data';
+import { formatStageId } from '@/lib/data-processor';
 
 interface StageOverviewProps {
   stageStats: StageStats[];
@@ -10,7 +11,7 @@ interface StageOverviewProps {
 
 export default function StageOverview({ stageStats }: StageOverviewProps) {
   const chartData = stageStats.map(stat => ({
-    stage: `Stage ${stat.stageId}`,
+    stage: formatStageId(stat.stageId),
     clearRate: parseFloat(stat.clearRate.toFixed(1)),
     attempts: stat.totalAttempts,
     clears: stat.clears,
@@ -133,7 +134,7 @@ export default function StageOverview({ stageStats }: StageOverviewProps) {
                     className={`border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors`}
                   >
                     <td className="py-3 px-4 text-white font-medium">
-                      Stage {stat.stageId}
+                      {formatStageId(stat.stageId)}
                     </td>
                     <td className="text-right py-3 px-4 text-slate-300">
                       {stat.totalAttempts}

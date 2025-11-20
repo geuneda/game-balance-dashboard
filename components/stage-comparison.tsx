@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ZAxis } from 'recharts';
 import { StageStats } from '@/types/game-data';
+import { formatStageId } from '@/lib/data-processor';
 
 interface StageComparisonProps {
   stageStats: StageStats[];
@@ -69,7 +70,7 @@ export default function StageComparison({ stageStats }: StageComparisonProps) {
               {topStages.map((stage, index) => (
                 <Radar
                   key={stage.stageId}
-                  name={`Stage ${stage.stageId}`}
+                  name={formatStageId(stage.stageId)}
                   dataKey={stage.stageId}
                   stroke={colors[index % colors.length]}
                   fill={colors[index % colors.length]}
@@ -133,7 +134,7 @@ export default function StageComparison({ stageStats }: StageComparisonProps) {
                     const data = payload[0].payload;
                     return (
                       <div className="bg-slate-800 border border-slate-600 rounded-lg p-3">
-                        <p className="font-semibold text-white">Stage {data.stage}</p>
+                        <p className="font-semibold text-white">{formatStageId(data.stage)}</p>
                         <p className="text-sm text-slate-300">클리어율: {data.clearRate.toFixed(1)}%</p>
                         <p className="text-sm text-slate-300">평균 실패 레벨: {data.avgFailLevel.toFixed(1)}</p>
                         <p className="text-sm text-slate-300">시도 횟수: {data.attempts}</p>
@@ -179,7 +180,7 @@ export default function StageComparison({ stageStats }: StageComparisonProps) {
                       </div>
                       <div>
                         <div className="font-semibold text-white">
-                          Stage {stat.stageId}
+                          {formatStageId(stat.stageId)}
                         </div>
                         <div className="text-xs text-slate-400">
                           시도: {stat.totalAttempts}회
@@ -224,7 +225,7 @@ export default function StageComparison({ stageStats }: StageComparisonProps) {
                       </div>
                       <div>
                         <div className="font-semibold text-white">
-                          Stage {stat.stageId}
+                          {formatStageId(stat.stageId)}
                         </div>
                         <div className="text-xs text-slate-400">
                           시도: {stat.totalAttempts}회
@@ -284,7 +285,7 @@ export default function StageComparison({ stageStats }: StageComparisonProps) {
                         #{index + 1}
                       </td>
                       <td className="py-3 px-4 text-white font-medium">
-                        Stage {stat.stageId}
+                        {formatStageId(stat.stageId)}
                       </td>
                       <td className="text-right py-3 px-4 text-red-400">
                         {stat.fails}

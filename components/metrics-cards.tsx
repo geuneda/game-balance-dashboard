@@ -1,23 +1,25 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Target, Layers } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Layers, Users } from 'lucide-react';
 
 interface MetricsCardsProps {
   totalEvents: number;
   overallClearRate: number;
   voluntaryExitRate: number;
   totalStages: number;
+  uniqueUserCount?: number;
 }
 
 export default function MetricsCards({
   totalEvents,
   overallClearRate,
   voluntaryExitRate,
-  totalStages
+  totalStages,
+  uniqueUserCount
 }: MetricsCardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium text-slate-300">
@@ -85,6 +87,23 @@ export default function MetricsCards({
           </p>
         </CardContent>
       </Card>
+
+      {uniqueUserCount !== undefined && uniqueUserCount > 0 && (
+        <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-slate-300">
+              유니크 사용자
+            </CardTitle>
+            <Users className="h-4 w-4 text-slate-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-400">{uniqueUserCount.toLocaleString()}</div>
+            <p className="text-xs text-slate-400 mt-1">
+              고유 플레이어 수
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

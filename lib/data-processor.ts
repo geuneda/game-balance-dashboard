@@ -1,4 +1,4 @@
-import { GameEvent, StageStats, DifficultySpike, FunnelData, FilterOptions, StageType } from '@/types/game-data';
+import { GameEvent, StageStats, DifficultySpike, FunnelData, FilterOptions, StageType, StageAttritionData, UserAttritionData, UserStageStats } from '@/types/game-data';
 
 export function parseCSVData(csvData: any[]): GameEvent[] {
   return csvData.map(row => {
@@ -12,8 +12,9 @@ export function parseCSVData(csvData: any[]): GameEvent[] {
       eventLabel: row['Event Label'],
       eventValue: row['Event Value'],
       customEventProperties: customProps,
+      userId: row['User ID'] || undefined,
       clientIpCountry: row['Client IP Country'] || undefined,
-      clientIpCountryCode: row['Client IP Country Code'] || undefined
+      clientIpCountryCode: row['Country'] || undefined  // Fixed: use 'Country' column for country code
     };
   });
 }
@@ -28,6 +29,33 @@ export function getStageType(stageId: string): StageType {
   if (id >= 4001 && id <= 4999) return 'luck';
   if (id >= 5001 && id <= 5999) return 'mass';
   return 'normal'; // Default to normal if not in range
+}
+
+/**
+ * Format stage ID to human-readable Korean format
+ * 2015 → "일반 15"
+ * 3012 → "정예 12"
+ * 4008 → "물량 8"
+ * 5020 → "운빨 20"
+ */
+export function formatStageId(stageId: string): string {
+  const id = parseInt(stageId);
+
+  if (id >= 2001 && id <= 2999) {
+    return `일반 ${id - 2000}`;
+  }
+  if (id >= 3001 && id <= 3999) {
+    return `정예 ${id - 3000}`;
+  }
+  if (id >= 4001 && id <= 4999) {
+    return `물량 ${id - 4000}`;
+  }
+  if (id >= 5001 && id <= 5999) {
+    return `운빨 ${id - 5000}`;
+  }
+
+  // Fallback: return original stageId if not in expected range
+  return stageId;
 }
 
 /**
@@ -214,6 +242,36 @@ export function calculateFunnelData(events: GameEvent[]): FunnelData[] {
   return funnelData;
 }
 
+export function calculateStageAttrition(stats: StageStats[]): StageAttritionData[] {
+  // 스테이지를 정렬하고 이탈률 계산
+  const sortedStats = [...stats].sort((a, b) => a.stageId.localeCompare(b.stageId));
+
+  return sortedStats.map((stage, index) => {
+    let attritionCount = 0;
+    let attritionRate = 0;
+
+    // 이전 스테이지의 시도 수와 현재 스테이지의 시도 수를 비교
+    // (이전 스테이지를 시도했지만 현재 스테이지를 시도하지 않은 사람 = 이탈)
+    if (index > 0) {
+      const prevStage = sortedStats[index - 1];
+      const prevAttempts = prevStage.totalAttempts;
+      const currentAttempts = stage.totalAttempts;
+
+      attritionCount = Math.max(0, prevAttempts - currentAttempts);
+      attritionRate = prevAttempts > 0
+        ? (attritionCount / prevAttempts) * 100
+        : 0;
+    }
+
+    return {
+      stageId: stage.stageId,
+      attempts: stage.totalAttempts,
+      attritionRate,
+      attritionCount
+    };
+  });
+}
+
 /**
  * Calculate funnel data for a specific stage
  */
@@ -282,4 +340,190 @@ export function getOverallClearRate(events: GameEvent[]): number {
   const totalAttempts = Math.max(attempts, clears + fails);
 
   return totalAttempts > 0 ? (clears / totalAttempts) * 100 : 0;
+}
+
+/**
+ * Calculate user-based attrition by tracking unique users at each stage
+ * This shows real player drop-off rather than just attempt counts
+ */
+export function calculateUserAttrition(events: GameEvent[]): UserAttritionData[] {
+  // Group events by stage
+  const stageMap = new Map<string, Set<string>>();
+
+  events.forEach(event => {
+    if (!event.userId) return;
+
+    const stageId = event.eventLabel;
+    if (!stageMap.has(stageId)) {
+      stageMap.set(stageId, new Set());
+    }
+    stageMap.get(stageId)!.add(event.userId);
+  });
+
+  // Sort stages
+  const sortedStages = Array.from(stageMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]));
+
+  const result: UserAttritionData[] = [];
+  let cumulativeUsers = 0;
+  const initialUsers = sortedStages.length > 0 ? sortedStages[0][1].size : 0;
+
+  sortedStages.forEach(([stageId, users], index) => {
+    const uniqueUsers = users.size;
+
+    // Calculate attrition compared to previous stage
+    let userAttritionCount = 0;
+    let userAttritionRate = 0;
+
+    if (index > 0) {
+      const prevUsers = sortedStages[index - 1][1].size;
+      userAttritionCount = Math.max(0, prevUsers - uniqueUsers);
+      userAttritionRate = prevUsers > 0 ? (userAttritionCount / prevUsers) * 100 : 0;
+    }
+
+    // Calculate cumulative attrition from the first stage
+    cumulativeUsers = uniqueUsers;
+    const cumulativeAttritionRate = initialUsers > 0
+      ? ((initialUsers - cumulativeUsers) / initialUsers) * 100
+      : 0;
+
+    result.push({
+      stageId,
+      uniqueUsers,
+      userAttritionCount,
+      userAttritionRate,
+      cumulativeUsers,
+      cumulativeAttritionRate
+    });
+  });
+
+  return result;
+}
+
+/**
+ * Get unique user count from events
+ */
+export function getUniqueUserCount(events: GameEvent[]): number {
+  const uniqueUsers = new Set<string>();
+  events.forEach(event => {
+    if (event.userId) {
+      uniqueUsers.add(event.userId);
+    }
+  });
+  return uniqueUsers.size;
+}
+
+/**
+ * Calculate user-based stage statistics
+ * Shows how many unique users attempted/cleared/failed each stage
+ */
+export function calculateUserStageStats(events: GameEvent[]): UserStageStats[] {
+  // Group events by stage and user
+  const stageUserMap = new Map<string, {
+    users: Set<string>;
+    userTryAttempts: Map<string, number>;
+    userClearFailCount: Map<string, number>;
+    hasTryEvents: boolean;
+    totalClears: number;
+    totalFails: number;
+    clearedUsers: Set<string>;
+    failedUsers: Set<string>;
+    voluntaryExitUsers: Set<string>;
+    repeatPlayUsers: Set<string>;
+  }>();
+
+  // First pass: collect all events per stage
+  events.forEach(event => {
+    if (!event.userId) return;
+
+    const stageId = event.eventLabel;
+    if (!stageUserMap.has(stageId)) {
+      stageUserMap.set(stageId, {
+        users: new Set(),
+        userTryAttempts: new Map(),
+        userClearFailCount: new Map(),
+        hasTryEvents: false,
+        totalClears: 0,
+        totalFails: 0,
+        clearedUsers: new Set(),
+        failedUsers: new Set(),
+        voluntaryExitUsers: new Set(),
+        repeatPlayUsers: new Set(),
+      });
+    }
+
+    const stageData = stageUserMap.get(stageId)!;
+    stageData.users.add(event.userId);
+
+    // Track 'try' attempts separately
+    if (event.eventAction === 'try') {
+      stageData.hasTryEvents = true;
+      const currentCount = stageData.userTryAttempts.get(event.userId) || 0;
+      stageData.userTryAttempts.set(event.userId, currentCount + 1);
+    }
+
+    // Track clear/fail counts as backup (in case 'try' events don't exist)
+    if (event.eventAction === 'clear' || event.eventAction === 'fail') {
+      const currentCount = stageData.userClearFailCount.get(event.userId) || 0;
+      stageData.userClearFailCount.set(event.userId, currentCount + 1);
+    }
+
+    // Track cleared users and total clears
+    if (event.eventAction === 'clear') {
+      stageData.clearedUsers.add(event.userId);
+      stageData.totalClears++;
+    }
+
+    // Track failed users
+    if (event.eventAction === 'fail') {
+      stageData.failedUsers.add(event.userId);
+      stageData.totalFails++;
+
+      // Track voluntary exits
+      if (event.customEventProperties.exit_type === 'voluntary_exit') {
+        stageData.voluntaryExitUsers.add(event.userId);
+      }
+    }
+
+    // Track repeat plays
+    if (event.customEventProperties.is_repeat_play) {
+      stageData.repeatPlayUsers.add(event.userId);
+    }
+  });
+
+  // Second pass: calculate statistics
+  const result: UserStageStats[] = [];
+
+  Array.from(stageUserMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([stageId, data]) => {
+      const uniqueUsers = data.users.size;
+
+      // Calculate total attempts from actual game results (clear + fail)
+      // This is more reliable than 'try' events which may not reflect actual outcomes
+      const totalClears = data.totalClears;
+      const totalFails = data.totalFails;
+      const totalAttempts = totalClears + totalFails;
+      const usersCleared = data.clearedUsers.size;
+      const usersFailed = data.failedUsers.size;
+      const userClearRate = uniqueUsers > 0 ? (usersCleared / uniqueUsers) * 100 : 0;
+      const clearProbability = (totalClears + totalFails) > 0 ? (totalClears / (totalClears + totalFails)) * 100 : 0;
+      const averageAttemptsPerUser = uniqueUsers > 0 ? totalAttempts / uniqueUsers : 0;
+
+      result.push({
+        stageId,
+        uniqueUsers,
+        totalAttempts,
+        totalClears,
+        usersCleared,
+        usersFailed,
+        userClearRate,
+        clearProbability,
+        averageAttemptsPerUser,
+        usersWithVoluntaryExit: data.voluntaryExitUsers.size,
+        usersWithRepeatPlay: data.repeatPlayUsers.size,
+      });
+    });
+
+  return result;
 }

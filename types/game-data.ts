@@ -8,6 +8,7 @@ export interface GameEvent {
     exit_type?: 'voluntary_exit';
     is_repeat_play?: boolean;
   };
+  userId?: string;
   clientIpCountry?: string;
   clientIpCountryCode?: string;
 }
@@ -35,6 +36,36 @@ export interface FunnelData {
   remaining: number;
   dropped: number;
   dropRate: number;
+}
+
+export interface StageAttritionData {
+  stageId: string;
+  attempts: number;
+  attritionRate: number;
+  attritionCount: number;
+}
+
+export interface UserAttritionData {
+  stageId: string;
+  uniqueUsers: number;
+  userAttritionCount: number;
+  userAttritionRate: number;
+  cumulativeUsers: number;
+  cumulativeAttritionRate: number;
+}
+
+export interface UserStageStats {
+  stageId: string;
+  uniqueUsers: number;
+  totalAttempts: number;
+  totalClears: number;
+  usersCleared: number;
+  usersFailed: number;
+  userClearRate: number;
+  clearProbability: number;
+  averageAttemptsPerUser: number;
+  usersWithVoluntaryExit: number;
+  usersWithRepeatPlay: number;
 }
 
 export type StageType = 'all' | 'normal' | 'elite' | 'luck' | 'mass';

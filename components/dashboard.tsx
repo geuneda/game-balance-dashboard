@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import { GameEvent, FilterOptions, StageType } from '@/types/game-data';
-import { parseCSVData, calculateStageStats, findDifficultySpikes, getVoluntaryExitRate, getOverallClearRate, filterEvents, getCountries } from '@/lib/data-processor';
+import { parseCSVData, calculateStageStats, findDifficultySpikes, getVoluntaryExitRate, getOverallClearRate, filterEvents, getCountries, calculateStageAttrition, calculateUserAttrition, getUniqueUserCount, calculateUserStageStats } from '@/lib/data-processor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +13,9 @@ import StageOverview from './stage-overview';
 import DifficultyCurve from './difficulty-curve';
 import FunnelAnalysis from './funnel-analysis';
 import StageComparison from './stage-comparison';
+import { AttritionAnalysis } from './attrition-analysis';
+import { UserAttritionAnalysis } from './user-attrition-analysis';
+import { UserStageAnalysis } from './user-stage-analysis';
 import MetricsCards from './metrics-cards';
 
 interface DataFileInfo {
@@ -245,6 +248,10 @@ export default function Dashboard() {
   const difficultySpikes = findDifficultySpikes(filteredData);
   const overallClearRate = getOverallClearRate(filteredData);
   const voluntaryExitRate = getVoluntaryExitRate(gameData); // Always use full data for this metric
+  const attritionData = calculateStageAttrition(stageStats);
+  const userAttritionData = calculateUserAttrition(filteredData);
+  const uniqueUserCount = getUniqueUserCount(filteredData);
+  const userStageStats = calculateUserStageStats(filteredData);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-4 md:p-8">
@@ -457,11 +464,12 @@ export default function Dashboard() {
           overallClearRate={overallClearRate}
           voluntaryExitRate={voluntaryExitRate}
           totalStages={stageStats.length}
+          uniqueUserCount={uniqueUserCount}
         />
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-slate-800 border border-slate-700">
+          <TabsList className="grid w-full grid-cols-7 bg-slate-800 border border-slate-700">
             <TabsTrigger
               value="overview"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -481,6 +489,24 @@ export default function Dashboard() {
               퍼널 분석
             </TabsTrigger>
             <TabsTrigger
+              value="attrition"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              이탈 분석
+            </TabsTrigger>
+            <TabsTrigger
+              value="user-attrition"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              사용자 이탈
+            </TabsTrigger>
+            <TabsTrigger
+              value="user-stage"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              사용자 스테이지
+            </TabsTrigger>
+            <TabsTrigger
               value="comparison"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
@@ -498,6 +524,18 @@ export default function Dashboard() {
 
           <TabsContent value="funnel" className="space-y-4">
             <FunnelAnalysis events={filteredData} />
+          </TabsContent>
+
+          <TabsContent value="attrition" className="space-y-4">
+            <AttritionAnalysis data={attritionData} />
+          </TabsContent>
+
+          <TabsContent value="user-attrition" className="space-y-4">
+            <UserAttritionAnalysis data={userAttritionData} />
+          </TabsContent>
+
+          <TabsContent value="user-stage" className="space-y-4">
+            <UserStageAnalysis data={userStageStats} />
           </TabsContent>
 
           <TabsContent value="comparison" className="space-y-4">
