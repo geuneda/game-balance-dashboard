@@ -1,15 +1,28 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
-import { FunnelData } from '@/types/game-data';
-import { Users, TrendingDown } from 'lucide-react';
+import { GameEvent } from '@/types/game-data';
+import { calculateFunnelData, calculateStageSpecificFunnelData, getStageIds } from '@/lib/data-processor';
+import { Users, TrendingDown, Target } from 'lucide-react';
 
 interface FunnelAnalysisProps {
-  funnelData: FunnelData[];
+  events: GameEvent[];
 }
 
-export default function FunnelAnalysis({ funnelData }: FunnelAnalysisProps) {
+export default function FunnelAnalysis({ events }: FunnelAnalysisProps) {
+  const [selectedStage, setSelectedStage] = useState<string>('all');
+
+  const stageIds = useMemo(() => getStageIds(events), [events]);
+
+  const funnelData = useMemo(() => {
+    if (selectedStage === 'all') {
+      return calculateFunnelData(events);
+    }
+    return calculateStageSpecificFunnelData(events, selectedStage);
+  }, [events, selectedStage]);
   const chartData = funnelData.map(data => ({
     level: `Lv ${data.level}`,
     remaining: data.remaining,
@@ -33,6 +46,44 @@ export default function FunnelAnalysis({ funnelData }: FunnelAnalysisProps) {
 
   return (
     <div className="grid grid-cols-1 gap-4">
+      {/* Stage Selector */}
+      <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-slate-400" />
+              <label className="text-sm font-medium text-white">
+                스테이지 선택
+              </label>
+            </div>
+            <Select value={selectedStage} onValueChange={setSelectedStage}>
+              <SelectTrigger className="w-[200px] bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="스테이지 선택" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-700">
+                <SelectItem value="all" className="text-white hover:bg-slate-700">
+                  전체 스테이지
+                </SelectItem>
+                {stageIds.map(stageId => (
+                  <SelectItem
+                    key={stageId}
+                    value={stageId}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    스테이지 {stageId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedStage !== 'all' && (
+              <span className="text-xs text-slate-400">
+                스테이지 {selectedStage}의 퍼널 데이터를 표시하고 있습니다
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
@@ -85,9 +136,9 @@ export default function FunnelAnalysis({ funnelData }: FunnelAnalysisProps) {
       {criticalDropoffs.length > 0 && (
         <Card className="border-red-700 bg-red-900/20 backdrop-blur">
           <CardHeader>
-            <CardTitle className="text-red-400">주요 이탈 구간</CardTitle>
+            <CardTitle className="text-red-400">주요 패배 구간</CardTitle>
             <CardDescription className="text-red-300/70">
-              15% 이상의 플레이어가 이탈한 레벨
+              15% 이상의 플레이어가 실패한 레벨
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -98,10 +149,10 @@ export default function FunnelAnalysis({ funnelData }: FunnelAnalysisProps) {
                     {data.level}
                   </div>
                   <div className="text-sm text-slate-300 mt-1">
-                    이탈: <span className="font-semibold">{data.dropped}명</span>
+                    실패: <span className="font-semibold">{data.dropped}명</span>
                   </div>
                   <div className="text-xs text-red-400 mt-1">
-                    이탈률: {data.dropRate}%
+                    실패율: {data.dropRate}%
                   </div>
                 </div>
               ))}
@@ -156,9 +207,9 @@ export default function FunnelAnalysis({ funnelData }: FunnelAnalysisProps) {
       {/* Drop Rate by Level */}
       <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
         <CardHeader>
-          <CardTitle className="text-white">레벨별 이탈률</CardTitle>
+          <CardTitle className="text-white">레벨별 실패율</CardTitle>
           <CardDescription className="text-slate-400">
-            각 레벨에서의 플레이어 이탈 비율
+            각 레벨에서의 플레이어 실패 비율
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -173,7 +224,7 @@ export default function FunnelAnalysis({ funnelData }: FunnelAnalysisProps) {
               <YAxis
                 stroke="#94a3b8"
                 tick={{ fill: '#94a3b8' }}
-                label={{ value: '이탈률 (%)', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                label={{ value: '실패율 (%)', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
               />
               <Tooltip
                 contentStyle={{
@@ -189,7 +240,7 @@ export default function FunnelAnalysis({ funnelData }: FunnelAnalysisProps) {
                 dataKey="dropRate"
                 stroke="#ef4444"
                 strokeWidth={2}
-                name="이탈률 (%)"
+                name="실패율 (%)"
                 dot={{ fill: '#ef4444', r: 4 }}
               />
             </LineChart>
@@ -260,8 +311,8 @@ export default function FunnelAnalysis({ funnelData }: FunnelAnalysisProps) {
                 <tr className="border-b border-slate-700">
                   <th className="text-left py-3 px-4 text-slate-300 font-medium">레벨</th>
                   <th className="text-right py-3 px-4 text-slate-300 font-medium">남은 플레이어</th>
-                  <th className="text-right py-3 px-4 text-slate-300 font-medium">이탈 플레이어</th>
-                  <th className="text-right py-3 px-4 text-slate-300 font-medium">이탈률</th>
+                  <th className="text-right py-3 px-4 text-slate-300 font-medium">실패 플레이어</th>
+                  <th className="text-right py-3 px-4 text-slate-300 font-medium">실패율</th>
                   <th className="text-right py-3 px-4 text-slate-300 font-medium">누적 리텐션</th>
                 </tr>
               </thead>
