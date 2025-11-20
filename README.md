@@ -4,33 +4,58 @@
 
 ## 🌟 주요 기능
 
-### 1. **데이터 업로드**
+### 1. **데이터 관리**
 - CSV 파일 업로드 지원
+- 여러 데이터 파일 선택 기능
 - 샘플 데이터로 빠른 시작 가능
 
-### 2. **메트릭 카드**
+### 2. **필터링**
+- 국가별 필터링 (전체 국가 또는 특정 국가)
+- 스테이지 타입 필터링 (전체/일반/정예/물량/운빨)
+- 필터 초기화 기능
+
+### 3. **메트릭 카드**
 - 총 이벤트 수
 - 전체 클리어율
 - 자발적 포기율
 - 총 스테이지 수
+- 유니크 사용자 수
 
-### 3. **개요 탭**
+### 4. **개요 탭**
 - 스테이지별 클리어율 차트
 - 평균 실패 레벨 분석
 - 상세 통계 테이블
+- 한글 스테이지 라벨 (일반/정예/물량/운빨)
 
-### 4. **난이도 분석 탭**
+### 5. **난이도 분석 탭**
 - 난이도 스파이크 자동 감지
 - 레벨별 실패율 곡선
 - 레벨별 실패 횟수 및 위험도 평가
 
-### 5. **퍼널 분석 탭**
+### 6. **퍼널 분석 탭**
 - 플레이어 리텐션 퍼널
 - 레벨별 이탈률 추적
 - 누적 리텐션율 곡선
 - 주요 이탈 구간 하이라이트
+- 스테이지별 퍼널 분석
 
-### 6. **스테이지 비교 탭**
+### 7. **이탈 분석 탭**
+- 스테이지별 이탈률 추적
+- 이탈 사용자 수 분석
+- 이탈 추이 시각화
+
+### 8. **사용자 이탈 탭**
+- 유니크 사용자 기반 이탈 분석
+- 스테이지별 사용자 이탈률
+- 누적 이탈률 추적
+
+### 9. **사용자 스테이지 탭**
+- 유니크 사용자 기반 통계
+- 스테이지별 사용자 클리어율
+- 사용자당 평균 시도 횟수
+- 자발적 포기 사용자 분석
+
+### 10. **스테이지 비교 탭**
 - 스테이지 종합 비교 레이더 차트
 - 클리어율 vs 평균 실패 레벨 산점도
 - 가장 쉬운/어려운 스테이지 순위
@@ -64,11 +89,11 @@ npm start
 CSV 파일은 다음 형식이어야 합니다:
 
 ```csv
-"Event Category","Event Action","Event Label","Event Value","Custom Event Properties"
-"stage (App)","try","2001",,"{""last_level"":1}"
-"stage (App)","clear","2001",,"{""last_level"":20}"
-"stage (App)","fail","2002",,"{""last_level"":5}"
-"stage (App)","fail","2002",,"{""exit_type"":""voluntary_exit"",""last_level"":1}"
+"Event Category","Event Action","Event Label","Event Value","Custom Event Properties","User ID","Country"
+"stage (App)","try","2001",,"{""last_level"":1}","user123","KR"
+"stage (App)","clear","2001",,"{""last_level"":20}","user123","KR"
+"stage (App)","fail","2002",,"{""last_level"":5}","user456","US"
+"stage (App)","fail","2002",,"{""exit_type"":""voluntary_exit"",""last_level"":1}","user789","JP"
 ```
 
 ### 필드 설명
@@ -77,16 +102,28 @@ CSV 파일은 다음 형식이어야 합니다:
 |------|------|
 | Event Category | 이벤트 카테고리 (예: "stage (App)") |
 | Event Action | 액션 타입: "try" (시도), "clear" (클리어), "fail" (실패) |
-| Event Label | 스테이지 ID (예: "2001", "2002") |
+| Event Label | 스테이지 ID (예: "2001", "3005", "4012") |
 | Event Value | (선택사항) 이벤트 값 |
 | Custom Event Properties | JSON 형식의 커스텀 속성 |
+| User ID | (선택사항) 유니크 사용자 ID |
+| Country | (선택사항) 국가 코드 (예: "KR", "US", "JP") |
+
+### 스테이지 ID 체계
+
+| 범위 | 타입 | 예시 |
+|------|------|------|
+| 2001-2999 | 일반 | 2001 → "일반 1", 2015 → "일반 15" |
+| 3001-3999 | 정예 | 3001 → "정예 1", 3020 → "정예 20" |
+| 4001-4999 | 물량 | 4008 → "물량 8" |
+| 5001-5999 | 운빨 | 5012 → "운빨 12" |
 
 ### Custom Event Properties
 
 ```json
 {
-  "last_level": 1-20,           // 마지막 인게임 레벨
-  "exit_type": "voluntary_exit"  // (선택) 자발적 포기 시에만 포함
+  "last_level": 1-20,             // 마지막 인게임 레벨
+  "exit_type": "voluntary_exit",  // (선택) 자발적 포기 시에만 포함
+  "is_repeat_play": true          // (선택) 반복 플레이 여부
 }
 ```
 
@@ -115,22 +152,29 @@ CSV 파일은 다음 형식이어야 합니다:
 ```
 game-balance-dashboard/
 ├── app/
-│   ├── page.tsx                    # 메인 페이지
-│   └── globals.css                 # 글로벌 스타일
+│   ├── page.tsx                        # 메인 페이지
+│   ├── globals.css                     # 글로벌 스타일
+│   └── api/
+│       └── data-files/
+│           └── route.ts                # 데이터 파일 관리 API
 ├── components/
-│   ├── dashboard.tsx               # 메인 대시보드
-│   ├── metrics-cards.tsx           # 메트릭 카드
-│   ├── stage-overview.tsx          # 스테이지 개요
-│   ├── difficulty-curve.tsx        # 난이도 곡선
-│   ├── funnel-analysis.tsx         # 퍼널 분석
-│   ├── stage-comparison.tsx        # 스테이지 비교
-│   └── ui/                         # shadcn UI 컴포넌트
+│   ├── dashboard.tsx                   # 메인 대시보드
+│   ├── metrics-cards.tsx               # 메트릭 카드
+│   ├── stage-overview.tsx              # 스테이지 개요
+│   ├── difficulty-curve.tsx            # 난이도 곡선
+│   ├── funnel-analysis.tsx             # 퍼널 분석
+│   ├── attrition-analysis.tsx          # 이탈 분석
+│   ├── user-attrition-analysis.tsx     # 사용자 이탈 분석
+│   ├── user-stage-analysis.tsx         # 사용자 스테이지 분석
+│   ├── stage-comparison.tsx            # 스테이지 비교
+│   └── ui/                             # shadcn UI 컴포넌트
 ├── lib/
-│   └── data-processor.ts           # 데이터 처리 로직
+│   └── data-processor.ts               # 데이터 처리 로직
 ├── types/
-│   └── game-data.ts                # 타입 정의
+│   └── game-data.ts                    # 타입 정의
 └── public/
-    └── sample_data.csv             # 샘플 데이터
+    └── data/                           # 데이터 파일 디렉토리
+        └── *.csv                       # CSV 데이터 파일들
 ```
 
 ## 💡 사용 팁
@@ -139,11 +183,15 @@ game-balance-dashboard/
 - **난이도 스파이크 자동 감지**: 급격한 난이도 상승 구간을 자동으로 표시
 - **자발적 포기율 분석**: 플레이어가 의도적으로 그만둔 비율 추적
 - **스테이지 순위**: 가장 쉬운/어려운 스테이지 즉시 파악
+- **사용자 이탈 분석**: 실제 플레이어 이탈 패턴 추적
+- **스테이지 타입별 필터링**: 일반/정예/물량/운빨 스테이지 비교 분석
 
 ### 개발자를 위한 기능
 - **상세 통계 테이블**: 정확한 수치 데이터 제공
 - **레벨별 위험도**: 각 레벨의 문제점 우선순위화
 - **리텐션 분석**: 플레이어 이탈 패턴 파악
+- **국가별 필터링**: 지역별 난이도 차이 분석
+- **유니크 사용자 기반 통계**: 실제 플레이어 행동 패턴 분석
 
 ### 주요 인사이트
 
@@ -151,6 +199,8 @@ game-balance-dashboard/
 2. **자발적 포기율이 30% 이상**: 재미없거나 지루함, 콘텐츠 개선 필요
 3. **특정 레벨의 실패율이 40% 이상**: 해당 레벨에 난이도 스파이크 존재
 4. **레벨별 이탈률이 20% 이상**: 해당 구간에 심각한 문제 존재
+5. **사용자 이탈률이 급증하는 스테이지**: 게임 이탈의 주요 원인, 우선 개선 필요
+6. **국가별 클리어율 차이**: 지역별 난이도 조정이나 현지화 개선 필요
 
 ## 🔍 분석 예시
 
