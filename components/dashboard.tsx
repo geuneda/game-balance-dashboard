@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FilterX, Database } from 'lucide-react';
+import { Upload, FilterX, Database, GraduationCap } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import StageOverview from './stage-overview';
 import DifficultyCurve from './difficulty-curve';
 import FunnelAnalysis from './funnel-analysis';
@@ -27,6 +28,7 @@ interface DataFileInfo {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [gameData, setGameData] = useState<GameEvent[]>([]);
   const [fileName, setFileName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -205,14 +207,25 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <Button
-              onClick={loadSampleData}
-              variant="outline"
-              className="w-full border-slate-600 text-slate-300 hover:bg-slate-700"
-              disabled={isLoading}
-            >
-              {isLoading ? '로딩 중...' : '샘플 데이터로 시작하기'}
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                onClick={loadSampleData}
+                variant="outline"
+                className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                disabled={isLoading}
+              >
+                {isLoading ? '로딩 중...' : '샘플 데이터로 시작하기'}
+              </Button>
+
+              <Button
+                onClick={() => router.push('/tutorial')}
+                variant="outline"
+                className="border-purple-600 text-purple-300 hover:bg-purple-900/50 hover:border-purple-500"
+              >
+                <GraduationCap className="w-4 h-4 mr-2" />
+                튜토리얼 분석
+              </Button>
+            </div>
 
             <div className="bg-slate-700/30 rounded-lg p-4 mt-6">
               <h3 className="font-semibold text-white mb-2">📊 분석 기능</h3>
