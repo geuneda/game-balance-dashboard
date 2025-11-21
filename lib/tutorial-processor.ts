@@ -49,6 +49,41 @@ export function parseTutorialCSVData(csvData: any[]): TutorialEvent[] {
 }
 
 /**
+ * Filter tutorial events to keep only one event per user per step
+ * This is useful for tutorial attrition analysis where each user should count only once per step
+ * @param events - Raw tutorial events
+ * @param keepFirst - If true, keep first occurrence; if false, keep last occurrence (default: true)
+ */
+export function filterUniqueUserEvents(events: TutorialEvent[], keepFirst: boolean = true): TutorialEvent[] {
+  // Map to track: userId-stepNumber -> event
+  const uniqueEventsMap = new Map<string, TutorialEvent>();
+
+  events.forEach(event => {
+    // If no userId, keep all events (can't deduplicate)
+    if (!event.userId) {
+      // Use a unique key for each event without userId
+      const key = `no-user-${Math.random()}`;
+      uniqueEventsMap.set(key, event);
+      return;
+    }
+
+    const key = `${event.userId}-${event.stepNumber}`;
+
+    if (keepFirst) {
+      // Keep first occurrence only
+      if (!uniqueEventsMap.has(key)) {
+        uniqueEventsMap.set(key, event);
+      }
+    } else {
+      // Keep last occurrence (overwrite)
+      uniqueEventsMap.set(key, event);
+    }
+  });
+
+  return Array.from(uniqueEventsMap.values());
+}
+
+/**
  * Calculate statistics for each tutorial step
  */
 export function calculateTutorialStepStats(events: TutorialEvent[]): TutorialStepStats[] {

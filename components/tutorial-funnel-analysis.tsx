@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Area, AreaChart } from 'recharts';
-import { TutorialEvent, calculateTutorialFunnel, calculateTutorialStepStats, getTutorialUniqueUserCount } from '@/lib/tutorial-processor';
+import { TutorialEvent, calculateTutorialFunnel, calculateTutorialStepStats, getTutorialUniqueUserCount, filterUniqueUserEvents } from '@/lib/tutorial-processor';
 import { getTutorialDescription, getTutorialShortDescription } from '@/lib/tutorial-mapping';
 
 interface Props {
@@ -10,9 +10,12 @@ interface Props {
 }
 
 export function TutorialFunnelAnalysis({ events }: Props) {
-  const stepStats = calculateTutorialStepStats(events);
-  const funnelData = calculateTutorialFunnel(events);
-  const totalUsers = getTutorialUniqueUserCount(events);
+  // Filter to keep only one event per user per step (first occurrence)
+  const filteredEvents = filterUniqueUserEvents(events, true);
+
+  const stepStats = calculateTutorialStepStats(filteredEvents);
+  const funnelData = calculateTutorialFunnel(filteredEvents);
+  const totalUsers = getTutorialUniqueUserCount(filteredEvents);
 
   // 특수 이벤트 분리 (63번: 패배 처리 이벤트)
   const specialEvents = stepStats.filter(stat => stat.stepId === '63');
@@ -78,7 +81,10 @@ export function TutorialFunnelAnalysis({ events }: Props) {
             <div>
               <p className="font-semibold">분석 범위</p>
               <p className="text-sm">
-                텍스트 탭 단계(01, 02, 03, 23, 37, 61)는 사용자 행동 분석에서 제외되었습니다.
+                <strong>• userID당 각 단계에서 첫 번째 이벤트만 분석</strong> (총 {events.length}개 이벤트 → {filteredEvents.length}개로 필터링)
+              </p>
+              <p className="text-sm mt-1">
+                • 텍스트 탭 단계(01, 02, 03, 23, 37, 61)는 사용자 행동 분석에서 제외되었습니다.
                 {filteredOutCount > 0 && ` 추가로 로그 누락이 의심되는 ${filteredOutCount}개 단계가 제외되었습니다.`}
               </p>
             </div>
