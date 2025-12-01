@@ -1,6 +1,6 @@
 export interface GameEvent {
   eventCategory: string;
-  eventAction: 'try' | 'clear' | 'fail';
+  eventAction: 'try' | 'clear' | 'fail' | 'clearIsFirst' | 'failIsFirst';
   eventLabel: string;
   eventValue: string;
   customEventProperties: {

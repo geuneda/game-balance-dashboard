@@ -1,5 +1,21 @@
 import { GameEvent, StageStats, DifficultySpike, FunnelData, FilterOptions, StageType, StageAttritionData, UserAttritionData, UserStageStats } from '@/types/game-data';
 
+/**
+ * Helper functions to check event action types
+ * Handles both regular and "IsFirst" variants (e.g., 'clear' and 'clearIsFirst')
+ */
+export function isClearEvent(event: GameEvent): boolean {
+  return event.eventAction === 'clear' || event.eventAction === 'clearIsFirst';
+}
+
+export function isFailEvent(event: GameEvent): boolean {
+  return event.eventAction === 'fail' || event.eventAction === 'failIsFirst';
+}
+
+export function isTryEvent(event: GameEvent): boolean {
+  return event.eventAction === 'try';
+}
+
 export function parseCSVData(csvData: any[]): GameEvent[] {
   return csvData.map(row => {
     const customProps = row['Custom Event Properties']
@@ -67,7 +83,7 @@ export function filterEvents(events: GameEvent[], options: FilterOptions): GameE
   // Filter out voluntary exits
   if (options.excludeVoluntaryExits) {
     filtered = filtered.filter(event => {
-      if (event.eventAction === 'fail' && event.customEventProperties.exit_type === 'voluntary_exit') {
+      if (isFailEvent(event) && event.customEventProperties.exit_type === 'voluntary_exit') {
         return false;
       }
       return true;
@@ -117,11 +133,11 @@ export function calculateStageStats(events: GameEvent[]): StageStats[] {
   const stats: StageStats[] = [];
 
   stageMap.forEach((stageEvents, stageId) => {
-    const tryEvents = stageEvents.filter(e => e.eventAction === 'try').length;
-    const clears = stageEvents.filter(e => e.eventAction === 'clear').length;
-    const fails = stageEvents.filter(e => e.eventAction === 'fail').length;
+    const tryEvents = stageEvents.filter(e => isTryEvent(e)).length;
+    const clears = stageEvents.filter(e => isClearEvent(e)).length;
+    const fails = stageEvents.filter(e => isFailEvent(e)).length;
     const voluntaryExits = stageEvents.filter(
-      e => e.eventAction === 'fail' && e.customEventProperties.exit_type === 'voluntary_exit'
+      e => isFailEvent(e) && e.customEventProperties.exit_type === 'voluntary_exit'
     ).length;
     const repeatPlays = stageEvents.filter(
       e => e.customEventProperties.is_repeat_play === true
@@ -131,7 +147,7 @@ export function calculateStageStats(events: GameEvent[]): StageStats[] {
     // This handles cases where event logging is incomplete
     const totalAttempts = Math.max(tryEvents, clears + fails);
 
-    const failEvents = stageEvents.filter(e => e.eventAction === 'fail');
+    const failEvents = stageEvents.filter(e => isFailEvent(e));
     const failsByLevel: Record<number, number> = {};
     let totalFailLevel = 0;
 
@@ -165,18 +181,18 @@ export function findDifficultySpikes(events: GameEvent[]): DifficultySpike[] {
   const attemptsByLevel: Record<number, number> = {};
 
   events.forEach(event => {
-    if (event.eventAction === 'fail') {
+    if (isFailEvent(event)) {
       const level = event.customEventProperties.last_level;
       failsByLevel[level] = (failsByLevel[level] || 0) + 1;
     }
 
-    if (event.eventAction === 'try') {
+    if (isTryEvent(event)) {
       for (let i = 1; i <= 20; i++) {
         attemptsByLevel[i] = (attemptsByLevel[i] || 0) + 1;
       }
     }
 
-    if (event.eventAction === 'fail') {
+    if (isFailEvent(event)) {
       const level = event.customEventProperties.last_level;
       for (let i = level + 1; i <= 20; i++) {
         attemptsByLevel[i] = Math.max(0, (attemptsByLevel[i] || 0) - 1);
@@ -202,13 +218,13 @@ export function findDifficultySpikes(events: GameEvent[]): DifficultySpike[] {
 }
 
 export function calculateFunnelData(events: GameEvent[]): FunnelData[] {
-  const totalTries = events.filter(e => e.eventAction === 'try').length;
-  const clearCount = events.filter(e => e.eventAction === 'clear').length;
-  
+  const totalTries = events.filter(e => isTryEvent(e)).length;
+  const clearCount = events.filter(e => isClearEvent(e)).length;
+
   // 각 레벨에서 실패한 횟수 (last_level === N인 경우)
   const failsByLevel: Record<number, number> = {};
   events.forEach(event => {
-    if (event.eventAction === 'fail') {
+    if (isFailEvent(event)) {
       const level = event.customEventProperties.last_level;
       failsByLevel[level] = (failsByLevel[level] || 0) + 1;
     }
@@ -323,18 +339,18 @@ export function getCountries(events: GameEvent[]): Array<{ code: string; name: s
 }
 
 export function getVoluntaryExitRate(events: GameEvent[]): number {
-  const fails = events.filter(e => e.eventAction === 'fail').length;
+  const fails = events.filter(e => isFailEvent(e)).length;
   const voluntaryExits = events.filter(
-    e => e.eventAction === 'fail' && e.customEventProperties.exit_type === 'voluntary_exit'
+    e => isFailEvent(e) && e.customEventProperties.exit_type === 'voluntary_exit'
   ).length;
 
   return fails > 0 ? (voluntaryExits / fails) * 100 : 0;
 }
 
 export function getOverallClearRate(events: GameEvent[]): number {
-  const attempts = events.filter(e => e.eventAction === 'try').length;
-  const clears = events.filter(e => e.eventAction === 'clear').length;
-  const fails = events.filter(e => e.eventAction === 'fail').length;
+  const attempts = events.filter(e => isTryEvent(e)).length;
+  const clears = events.filter(e => isClearEvent(e)).length;
+  const fails = events.filter(e => isFailEvent(e)).length;
 
   // Fallback: if 'try' events are missing or inconsistent, use clears + fails
   const totalAttempts = Math.max(attempts, clears + fails);
@@ -456,26 +472,26 @@ export function calculateUserStageStats(events: GameEvent[]): UserStageStats[] {
     stageData.users.add(event.userId);
 
     // Track 'try' attempts separately
-    if (event.eventAction === 'try') {
+    if (isTryEvent(event)) {
       stageData.hasTryEvents = true;
       const currentCount = stageData.userTryAttempts.get(event.userId) || 0;
       stageData.userTryAttempts.set(event.userId, currentCount + 1);
     }
 
     // Track clear/fail counts as backup (in case 'try' events don't exist)
-    if (event.eventAction === 'clear' || event.eventAction === 'fail') {
+    if (isClearEvent(event) || isFailEvent(event)) {
       const currentCount = stageData.userClearFailCount.get(event.userId) || 0;
       stageData.userClearFailCount.set(event.userId, currentCount + 1);
     }
 
     // Track cleared users and total clears
-    if (event.eventAction === 'clear') {
+    if (isClearEvent(event)) {
       stageData.clearedUsers.add(event.userId);
       stageData.totalClears++;
     }
 
     // Track failed users
-    if (event.eventAction === 'fail') {
+    if (isFailEvent(event)) {
       stageData.failedUsers.add(event.userId);
       stageData.totalFails++;
 
