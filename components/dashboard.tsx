@@ -17,6 +17,7 @@ import StageComparison from './stage-comparison';
 import { AttritionAnalysis } from './attrition-analysis';
 import { UserAttritionAnalysis } from './user-attrition-analysis';
 import { UserStageAnalysis } from './user-stage-analysis';
+import { FirstClearAnalysis } from './first-clear-analysis';
 import MetricsCards from './metrics-cards';
 
 interface DataFileInfo {
@@ -482,7 +483,7 @@ export default function Dashboard() {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 bg-slate-800 border border-slate-700">
+          <TabsList className="grid w-full grid-cols-8 bg-slate-800 border border-slate-700">
             <TabsTrigger
               value="overview"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -520,6 +521,12 @@ export default function Dashboard() {
               사용자 스테이지
             </TabsTrigger>
             <TabsTrigger
+              value="first-clear"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              첫 클리어
+            </TabsTrigger>
+            <TabsTrigger
               value="comparison"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
@@ -549,6 +556,10 @@ export default function Dashboard() {
 
           <TabsContent value="user-stage" className="space-y-4">
             <UserStageAnalysis data={userStageStats} />
+          </TabsContent>
+
+          <TabsContent value="first-clear" className="space-y-4">
+            <FirstClearAnalysis events={filteredData} />
           </TabsContent>
 
           <TabsContent value="comparison" className="space-y-4">

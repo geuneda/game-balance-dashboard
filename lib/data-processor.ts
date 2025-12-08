@@ -1,4 +1,4 @@
-import { GameEvent, StageStats, DifficultySpike, FunnelData, FilterOptions, StageType, StageAttritionData, UserAttritionData, UserStageStats } from '@/types/game-data';
+import { GameEvent, StageStats, DifficultySpike, FunnelData, FilterOptions, StageType, StageAttritionData, UserAttritionData, UserStageStats, FirstClearStageData } from '@/types/game-data';
 
 /**
  * Helper functions to check event action types
@@ -542,4 +542,69 @@ export function calculateUserStageStats(events: GameEvent[]): UserStageStats[] {
     });
 
   return result;
+}
+
+/**
+ * Check if event is a first clear event
+ */
+export function isFirstClearEvent(event: GameEvent): boolean {
+  return event.eventAction === 'clearIsFirst';
+}
+
+/**
+ * Calculate first clear statistics by try count for a specific stage
+ * This shows how many unique users achieved their first clear on each try count
+ */
+export function calculateFirstClearByTryCount(events: GameEvent[], stageId: string): FirstClearStageData {
+  // Filter events for the specific stage
+  const stageEvents = events.filter(e => e.eventLabel === stageId);
+
+  // Group events by user
+  const userEvents = new Map<string, GameEvent[]>();
+  stageEvents.forEach(event => {
+    if (!event.userId) return;
+    if (!userEvents.has(event.userId)) {
+      userEvents.set(event.userId, []);
+    }
+    userEvents.get(event.userId)!.push(event);
+  });
+
+  // For each user with a first clear, count how many tries they made
+  const tryCountMap = new Map<number, number>(); // tryCount -> userCount
+  let totalFirstClearUsers = 0;
+
+  userEvents.forEach((events, userId) => {
+    // Check if user has a first clear event for this stage
+    const hasFirstClear = events.some(e => isFirstClearEvent(e));
+    if (!hasFirstClear) return;
+
+    totalFirstClearUsers++;
+
+    // Count try events for this user
+    const tryCount = events.filter(e => isTryEvent(e)).length;
+
+    // If no try events, assume at least 1 try (the clear itself implies a try)
+    const actualTryCount = Math.max(tryCount, 1);
+
+    tryCountMap.set(actualTryCount, (tryCountMap.get(actualTryCount) || 0) + 1);
+  });
+
+  // Convert to sorted array
+  const byTryCount = Array.from(tryCountMap.entries())
+    .map(([tryCount, userCount]) => ({ tryCount, userCount }))
+    .sort((a, b) => a.tryCount - b.tryCount);
+
+  return {
+    stageId,
+    totalFirstClearUsers,
+    byTryCount
+  };
+}
+
+/**
+ * Calculate first clear statistics for all stages
+ */
+export function calculateAllFirstClearStats(events: GameEvent[]): FirstClearStageData[] {
+  const stageIds = getStageIds(events);
+  return stageIds.map(stageId => calculateFirstClearByTryCount(events, stageId));
 }

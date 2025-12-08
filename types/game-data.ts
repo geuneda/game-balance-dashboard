@@ -76,3 +76,14 @@ export interface FilterOptions {
   stageType: StageType;
   selectedCountries: string[];
 }
+
+export interface FirstClearByTryCount {
+  tryCount: number;
+  userCount: number;
+}
+
+export interface FirstClearStageData {
+  stageId: string;
+  totalFirstClearUsers: number;
+  byTryCount: FirstClearByTryCount[];
+}
