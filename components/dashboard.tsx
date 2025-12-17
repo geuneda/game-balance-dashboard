@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FilterX, Database, GraduationCap } from 'lucide-react';
+import { Upload, FilterX, Database, GraduationCap, Trash2, Plus, Loader2, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import StageOverview from './stage-overview';
 import DifficultyCurve from './difficulty-curve';
@@ -27,6 +27,8 @@ interface DataFileInfo {
   startDate: string;
   endDate: string;
   filePath: string;
+  uploadedAt?: string;
+  isBlob?: boolean;
 }
 
 export default function Dashboard() {
@@ -41,18 +43,100 @@ export default function Dashboard() {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [availableFiles, setAvailableFiles] = useState<DataFileInfo[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
 
-  // Fetch available data files on mount
-  useEffect(() => {
+  const fetchDataFiles = () => {
     fetch('/api/data-files')
       .then(res => res.json())
       .then(data => {
-        if (data.files && data.files.length > 0) {
+        if (data.files) {
           setAvailableFiles(data.files);
         }
       })
       .catch(error => console.error('Error fetching data files:', error));
+  };
+
+  // Fetch available data files on mount
+  useEffect(() => {
+    fetchDataFiles();
   }, []);
+
+  const handleUploadToServer = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadMessage(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/data-files', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setUploadMessage({ type: 'success', text: result.message || '파일이 업로드되었습니다' });
+        fetchDataFiles(); // Refresh the file list
+        
+        // Auto-load the uploaded file
+        setTimeout(() => {
+          loadDataFile(result.filePath, result.fileName);
+          setSelectedFile(result.filePath);
+        }, 500);
+      } else {
+        setUploadMessage({ type: 'error', text: result.error || '업로드 실패' });
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadMessage({ type: 'error', text: '업로드 중 오류가 발생했습니다' });
+    } finally {
+      setIsUploading(false);
+      // Clear the input
+      event.target.value = '';
+    }
+  };
+
+  const handleDeleteFile = async (file: DataFileInfo) => {
+    if (!confirm(`"${file.fileName}" 파일을 삭제하시겠습니까?`)) return;
+
+    setDeletingFile(file.fileName);
+
+    try {
+      // Build query params based on whether it's a blob file or local file
+      const params = new URLSearchParams();
+      if (file.isBlob) {
+        params.set('blobUrl', file.filePath);
+      } else {
+        params.set('fileName', file.fileName);
+      }
+
+      const response = await fetch(`/api/data-files?${params.toString()}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        fetchDataFiles(); // Refresh the file list
+        if (selectedFile === file.filePath) {
+          setSelectedFile('');
+        }
+      } else {
+        const result = await response.json();
+        alert(result.error || '삭제 실패');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('삭제 중 오류가 발생했습니다');
+    } finally {
+      setDeletingFile(null);
+    }
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -135,55 +219,122 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Available Data Files Section */}
-            {availableFiles.length > 0 && (
-              <>
-                <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Database className="w-5 h-5 text-blue-400" />
-                    <h3 className="font-semibold text-white">사용 가능한 데이터</h3>
-                  </div>
+            {/* Data Management Section */}
+            <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-blue-400" />
+                  <h3 className="font-semibold text-white">데이터 관리</h3>
+                </div>
+                <label htmlFor="server-upload" className="cursor-pointer">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-600 text-blue-300 hover:bg-blue-900/50 hover:border-blue-500"
+                    disabled={isUploading}
+                    asChild
+                  >
+                    <span>
+                      {isUploading ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4 mr-2" />
+                      )}
+                      {isUploading ? '업로드 중...' : '새 파일 추가'}
+                    </span>
+                  </Button>
+                  <input
+                    id="server-upload"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleUploadToServer}
+                    className="hidden"
+                    disabled={isUploading}
+                  />
+                </label>
+              </div>
+
+              {/* Upload Message */}
+              {uploadMessage && (
+                <div className={`mb-3 p-2 rounded text-sm flex items-center gap-2 ${
+                  uploadMessage.type === 'success' 
+                    ? 'bg-green-900/30 border border-green-700/50 text-green-300'
+                    : 'bg-red-900/30 border border-red-700/50 text-red-300'
+                }`}>
+                  {uploadMessage.type === 'success' && <Check className="w-4 h-4" />}
+                  {uploadMessage.text}
+                </div>
+              )}
+
+              {availableFiles.length > 0 ? (
+                <>
                   <p className="text-sm text-slate-300 mb-3">
                     {availableFiles.length}개의 데이터 파일이 있습니다
                   </p>
-                  <Select
-                    value={selectedFile}
-                    onValueChange={(value) => {
-                      setSelectedFile(value);
-                      const file = availableFiles.find(f => f.filePath === value);
-                      if (file) {
-                        loadDataFile(file.filePath, file.displayName);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full bg-slate-700 border-slate-600 text-white">
-                      <SelectValue placeholder="데이터 기간 선택..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-700 max-h-[300px]">
-                      {availableFiles.map((file) => (
-                        <SelectItem
-                          key={file.filePath}
-                          value={file.filePath}
-                          className="text-white hover:bg-slate-700"
+                  
+                  {/* File List */}
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {availableFiles.map((file) => (
+                      <div
+                        key={file.filePath}
+                        className={`flex items-center justify-between p-2 rounded-md transition-colors ${
+                          selectedFile === file.filePath
+                            ? 'bg-blue-800/40 border border-blue-600'
+                            : 'bg-slate-700/50 hover:bg-slate-700 border border-transparent'
+                        }`}
+                      >
+                        <button
+                          onClick={() => {
+                            setSelectedFile(file.filePath);
+                            loadDataFile(file.filePath, file.displayName);
+                          }}
+                          className="flex-1 text-left"
+                          disabled={isLoading}
                         >
-                          📅 {file.displayName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">📅</span>
+                            <div>
+                              <p className="text-sm font-medium text-white">{file.displayName}</p>
+                              <p className="text-xs text-slate-400 truncate max-w-[300px]">{file.fileName}</p>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteFile(file)}
+                          className="p-1.5 rounded hover:bg-red-900/50 text-slate-400 hover:text-red-400 transition-colors"
+                          disabled={deletingFile === file.fileName}
+                          title="파일 삭제"
+                        >
+                          {deletingFile === file.fileName ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-4 text-slate-400">
+                  <Database className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">저장된 데이터 파일이 없습니다</p>
+                  <p className="text-xs mt-1">위 버튼으로 CSV 파일을 추가하세요</p>
                 </div>
+              )}
+            </div>
 
-                <div className="text-center">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-600"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-2 bg-slate-800/50 text-slate-400">또는</span>
-                    </div>
+            {availableFiles.length > 0 && (
+              <div className="text-center">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-600"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-slate-800/50 text-slate-400">또는 직접 파일 선택</span>
                   </div>
                 </div>
-              </>
+              </div>
             )}
 
             <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-600 rounded-lg p-12 hover:border-slate-500 transition-colors">
