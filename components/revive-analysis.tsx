@@ -113,10 +113,10 @@ export function ReviveAnalysis({ data }: Props) {
         <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
+                <Card className="border-slate-700 bg-slate-800/50 backdrop-blur cursor-help" title="모든 부활 이벤트의 총 개수. 한 게임에서 3회 부활하면 이벤트 3개가 발생합니다.">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-slate-300">
-                            총 부활 이벤트
+                            총 부활 이벤트 <span className="text-slate-500">ⓘ</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -129,10 +129,10 @@ export function ReviveAnalysis({ data }: Props) {
                     </CardContent>
                 </Card>
 
-                <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
+                <Card className="border-slate-700 bg-slate-800/50 backdrop-blur cursor-help" title="부활이 1회 이상 발생한 게임의 수. 1회+2회+3회+4회+ 합계와 동일합니다.">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-slate-300">
-                            부활 사용 게임
+                            부활 사용 게임 <span className="text-slate-500">ⓘ</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -145,10 +145,10 @@ export function ReviveAnalysis({ data }: Props) {
                     </CardContent>
                 </Card>
 
-                <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
+                <Card className="border-slate-700 bg-slate-800/50 backdrop-blur cursor-help" title="총 부활 이벤트 ÷ 부활 사용 게임. 부활이 있는 게임당 평균 부활 횟수입니다.">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-slate-300">
-                            게임당 평균 부활
+                            게임당 평균 부활 <span className="text-slate-500">ⓘ</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -426,17 +426,27 @@ export function ReviveAnalysis({ data }: Props) {
                             <thead className="border-b border-slate-700">
                                 <tr className="text-slate-300">
                                     <th className="text-left p-2">스테이지</th>
-                                    <th className="text-right p-2">총 부활</th>
-                                    <th className="text-right p-2">
-                                        부활 게임
+                                    <th className="text-right p-2 cursor-help" title="모든 부활 이벤트의 총 개수. 한 게임에서 3회 부활하면 이벤트 3개가 발생합니다.">
+                                        총 부활 <span className="text-slate-500">ⓘ</span>
                                     </th>
-                                    <th className="text-right p-2">
-                                        평균 부활/게임
+                                    <th className="text-right p-2 cursor-help" title="부활이 1회 이상 발생한 게임의 수. 1회+2회+3회+4회+ 합계와 동일합니다.">
+                                        부활 게임 <span className="text-slate-500">ⓘ</span>
                                     </th>
-                                    <th className="text-right p-2">1회</th>
-                                    <th className="text-right p-2">2회</th>
-                                    <th className="text-right p-2">3회</th>
-                                    <th className="text-right p-2">4회+</th>
+                                    <th className="text-right p-2 cursor-help" title="총 부활 ÷ 부활 게임. 부활이 있는 게임당 평균 부활 횟수입니다.">
+                                        평균 부활/게임 <span className="text-slate-500">ⓘ</span>
+                                    </th>
+                                    <th className="text-right p-2 cursor-help" title="정확히 1회만 부활하고 게임을 끝낸 게임 수">
+                                        1회 <span className="text-slate-500">ⓘ</span>
+                                    </th>
+                                    <th className="text-right p-2 cursor-help" title="정확히 2회만 부활하고 게임을 끝낸 게임 수">
+                                        2회 <span className="text-slate-500">ⓘ</span>
+                                    </th>
+                                    <th className="text-right p-2 cursor-help" title="정확히 3회만 부활하고 게임을 끝낸 게임 수">
+                                        3회 <span className="text-slate-500">ⓘ</span>
+                                    </th>
+                                    <th className="text-right p-2 cursor-help" title="4회 이상 부활하고 게임을 끝낸 게임 수">
+                                        4회+ <span className="text-slate-500">ⓘ</span>
+                                    </th>
                                     <th className="text-left p-2">부활 타입</th>
                                 </tr>
                             </thead>
