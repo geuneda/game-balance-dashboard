@@ -732,11 +732,12 @@ export function calculateStageReviveStats(
     const result: StageReviveStats[] = [];
 
     stageMap.forEach((events, stageId) => {
-        // Group by userId to calculate per-game stats
-        // Each user + stage + session = one game
-        // Since revive_count increments within a game, the max revive_count per user indicates total revives in that game
-        const userMaxReviveCount = new Map<string, number>();
         const reviveTypeCount: Record<string, number> = {};
+
+        // Count events by revive_count value
+        // revive_count=N means this is the Nth revive in a game session
+        // So count of revive_count=N = number of games that had at least N revives
+        const reviveCountEventCount = new Map<number, number>();
 
         events.forEach((event) => {
             // Track revive types
@@ -744,49 +745,34 @@ export function calculateStageReviveStats(
             reviveTypeCount[reviveType] =
                 (reviveTypeCount[reviveType] || 0) + 1;
 
-            // Track max revive count per user (represents total revives in their latest game)
-            // Note: This assumes we're looking at single sessions. For multi-session analysis,
-            // we'd need session IDs
-            if (event.userId) {
-                const currentMax = userMaxReviveCount.get(event.userId) || 0;
-                if (event.reviveCount > currentMax) {
-                    userMaxReviveCount.set(event.userId, event.reviveCount);
-                }
-            }
-        });
-
-        // Calculate revive count distribution based on max revive per user
-        const reviveDistMap = new Map<number, number>();
-        userMaxReviveCount.forEach((maxReviveCount) => {
-            reviveDistMap.set(
-                maxReviveCount,
-                (reviveDistMap.get(maxReviveCount) || 0) + 1
+            // Count events by revive_count
+            reviveCountEventCount.set(
+                event.reviveCount,
+                (reviveCountEventCount.get(event.reviveCount) || 0) + 1
             );
         });
 
-        // Convert to sorted array
-        const reviveCountDistribution: ReviveCountDistribution[] = Array.from(
-            reviveDistMap.entries()
-        )
-            .map(([reviveCount, gameCount]) => ({ reviveCount, gameCount }))
-            .sort((a, b) => a.reviveCount - b.reviveCount);
+        // Calculate "exactly N revives" distribution
+        // Games with exactly N revives = (games with at least N) - (games with at least N+1)
+        // revive_count=N event count = games that reached Nth revive
+        const maxReviveCount = Math.max(...Array.from(reviveCountEventCount.keys()), 0);
+        const reviveCountDistribution: ReviveCountDistribution[] = [];
 
-        // If no user IDs, fall back to counting revive events directly
-        if (reviveCountDistribution.length === 0 && events.length > 0) {
-            const directDistMap = new Map<number, number>();
-            events.forEach((event) => {
-                directDistMap.set(
-                    event.reviveCount,
-                    (directDistMap.get(event.reviveCount) || 0) + 1
-                );
-            });
-            Array.from(directDistMap.entries())
-                .map(([reviveCount, gameCount]) => ({ reviveCount, gameCount }))
-                .sort((a, b) => a.reviveCount - b.reviveCount)
-                .forEach((item) => reviveCountDistribution.push(item));
+        for (let n = 1; n <= maxReviveCount; n++) {
+            const atLeastN = reviveCountEventCount.get(n) || 0;
+            const atLeastNPlus1 = reviveCountEventCount.get(n + 1) || 0;
+            const exactlyN = atLeastN - atLeastNPlus1;
+
+            if (exactlyN > 0) {
+                reviveCountDistribution.push({
+                    reviveCount: n,
+                    gameCount: exactlyN,
+                });
+            }
         }
 
-        const totalGamesWithRevive = userMaxReviveCount.size || events.length;
+        // Total games with revive = count of revive_count=1 events (first revive of each game)
+        const totalGamesWithRevive = reviveCountEventCount.get(1) || 0;
         const totalReviveEvents = events.length;
         const averageRevivePerGame =
             totalGamesWithRevive > 0
@@ -811,47 +797,49 @@ export function calculateStageReviveStats(
  */
 export function getOverallReviveStats(reviveEvents: ReviveEvent[]): {
     totalReviveEvents: number;
-    uniqueUsersWithRevive: number;
-    averageRevivePerUser: number;
+    totalGamesWithRevive: number;
+    averageRevivePerGame: number;
     reviveCountDistribution: ReviveCountDistribution[];
 } {
-    const userMaxReviveCount = new Map<string, number>();
+    // Count events by revive_count value
+    const reviveCountEventCount = new Map<number, number>();
 
     reviveEvents.forEach((event) => {
-        if (event.userId) {
-            const currentMax = userMaxReviveCount.get(event.userId) || 0;
-            if (event.reviveCount > currentMax) {
-                userMaxReviveCount.set(event.userId, event.reviveCount);
-            }
-        }
-    });
-
-    // Calculate distribution
-    const reviveDistMap = new Map<number, number>();
-    userMaxReviveCount.forEach((maxReviveCount) => {
-        reviveDistMap.set(
-            maxReviveCount,
-            (reviveDistMap.get(maxReviveCount) || 0) + 1
+        reviveCountEventCount.set(
+            event.reviveCount,
+            (reviveCountEventCount.get(event.reviveCount) || 0) + 1
         );
     });
 
-    const reviveCountDistribution: ReviveCountDistribution[] = Array.from(
-        reviveDistMap.entries()
-    )
-        .map(([reviveCount, gameCount]) => ({ reviveCount, gameCount }))
-        .sort((a, b) => a.reviveCount - b.reviveCount);
+    // Calculate "exactly N revives" distribution
+    const maxReviveCount = Math.max(...Array.from(reviveCountEventCount.keys()), 0);
+    const reviveCountDistribution: ReviveCountDistribution[] = [];
 
-    const uniqueUsersWithRevive = userMaxReviveCount.size;
+    for (let n = 1; n <= maxReviveCount; n++) {
+        const atLeastN = reviveCountEventCount.get(n) || 0;
+        const atLeastNPlus1 = reviveCountEventCount.get(n + 1) || 0;
+        const exactlyN = atLeastN - atLeastNPlus1;
+
+        if (exactlyN > 0) {
+            reviveCountDistribution.push({
+                reviveCount: n,
+                gameCount: exactlyN,
+            });
+        }
+    }
+
+    // Total games with revive = count of revive_count=1 events
+    const totalGamesWithRevive = reviveCountEventCount.get(1) || 0;
     const totalReviveEvents = reviveEvents.length;
-    const averageRevivePerUser =
-        uniqueUsersWithRevive > 0
-            ? totalReviveEvents / uniqueUsersWithRevive
+    const averageRevivePerGame =
+        totalGamesWithRevive > 0
+            ? totalReviveEvents / totalGamesWithRevive
             : 0;
 
     return {
         totalReviveEvents,
-        uniqueUsersWithRevive,
-        averageRevivePerUser,
+        totalGamesWithRevive,
+        averageRevivePerGame,
         reviveCountDistribution,
     };
 }
