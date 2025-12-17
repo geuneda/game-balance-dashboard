@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { GameEvent, FilterOptions, StageType } from '@/types/game-data';
-import { parseCSVData, calculateStageStats, findDifficultySpikes, getVoluntaryExitRate, getOverallClearRate, filterEvents, getCountries, calculateStageAttrition, calculateUserAttrition, getUniqueUserCount, calculateUserStageStats } from '@/lib/data-processor';
+import { GameEvent, FilterOptions, StageType, ReviveEvent } from '@/types/game-data';
+import { parseCSVData, calculateStageStats, findDifficultySpikes, getVoluntaryExitRate, getOverallClearRate, filterEvents, getCountries, calculateStageAttrition, calculateUserAttrition, getUniqueUserCount, calculateUserStageStats, parseReviveEvents, calculateStageReviveStats } from '@/lib/data-processor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,6 +18,7 @@ import { AttritionAnalysis } from './attrition-analysis';
 import { UserAttritionAnalysis } from './user-attrition-analysis';
 import { UserStageAnalysis } from './user-stage-analysis';
 import { FirstClearAnalysis } from './first-clear-analysis';
+import { ReviveAnalysis } from './revive-analysis';
 import MetricsCards from './metrics-cards';
 
 interface DataFileInfo {
@@ -31,6 +32,7 @@ interface DataFileInfo {
 export default function Dashboard() {
   const router = useRouter();
   const [gameData, setGameData] = useState<GameEvent[]>([]);
+  const [reviveData, setReviveData] = useState<ReviveEvent[]>([]);
   const [fileName, setFileName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [excludeVoluntaryExits, setExcludeVoluntaryExits] = useState(false);
@@ -64,7 +66,9 @@ export default function Dashboard() {
       skipEmptyLines: true,
       complete: (results) => {
         const events = parseCSVData(results.data);
+        const reviveEvents = parseReviveEvents(results.data);
         setGameData(events);
+        setReviveData(reviveEvents);
         setIsLoading(false);
       },
       error: (error) => {
@@ -84,7 +88,9 @@ export default function Dashboard() {
           skipEmptyLines: true,
           complete: (results) => {
             const events = parseCSVData(results.data);
+            const reviveEvents = parseReviveEvents(results.data);
             setGameData(events);
+            setReviveData(reviveEvents);
             setFileName(displayName);
             setIsLoading(false);
           }
@@ -106,7 +112,9 @@ export default function Dashboard() {
           skipEmptyLines: true,
           complete: (results) => {
             const events = parseCSVData(results.data);
+            const reviveEvents = parseReviveEvents(results.data);
             setGameData(events);
+            setReviveData(reviveEvents);
             setFileName('sample_data.csv');
             setIsLoading(false);
           }
@@ -266,6 +274,7 @@ export default function Dashboard() {
   const userAttritionData = calculateUserAttrition(filteredData);
   const uniqueUserCount = getUniqueUserCount(filteredData);
   const userStageStats = calculateUserStageStats(filteredData);
+  const reviveStats = calculateStageReviveStats(reviveData);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-4 md:p-8">
@@ -483,7 +492,7 @@ export default function Dashboard() {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-8 bg-slate-800 border border-slate-700">
+          <TabsList className="grid w-full grid-cols-9 bg-slate-800 border border-slate-700">
             <TabsTrigger
               value="overview"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -521,6 +530,12 @@ export default function Dashboard() {
               사용자 스테이지
             </TabsTrigger>
             <TabsTrigger
+              value="revive"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              부활 분석
+            </TabsTrigger>
+            <TabsTrigger
               value="first-clear"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
@@ -555,7 +570,11 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="user-stage" className="space-y-4">
-            <UserStageAnalysis data={userStageStats} />
+            <UserStageAnalysis data={userStageStats} reviveStats={reviveStats} />
+          </TabsContent>
+
+          <TabsContent value="revive" className="space-y-4">
+            <ReviveAnalysis data={reviveStats} />
           </TabsContent>
 
           <TabsContent value="first-clear" className="space-y-4">
