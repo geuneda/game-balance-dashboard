@@ -7,6 +7,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { TableHeaderTooltip } from "@/components/ui/info-tooltip";
 import { UserStageStats, StageReviveStats } from "@/types/game-data";
 import {
     BarChart,
@@ -509,45 +510,19 @@ export function UserStageAnalysis({ data, reviveStats = [] }: Props) {
                             <thead className="border-b border-slate-700">
                                 <tr className="text-slate-300">
                                     <th className="text-left p-2">스테이지</th>
-                                    <th className="text-right p-2 cursor-help" title="해당 스테이지에 시도한 고유 사용자 수 (User ID 기준)">
-                                        유니크 사용자 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="총 클리어 + 총 실패 횟수. 해당 스테이지의 모든 게임 결과 수">
-                                        총 시도 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="클리어 이벤트 총 개수. 한 사용자가 여러 번 클리어할 수 있음">
-                                        총 클리어 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="1회 이상 클리어한 유니크 사용자 수">
-                                        클리어한 사용자 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="1회 이상 실패한 유니크 사용자 수 (클리어한 사용자와 중복 가능)">
-                                        실패한 사용자 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="클리어한 사용자 ÷ 유니크 사용자 × 100. 유저 기준 통과율">
-                                        통과율 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="총 클리어 ÷ 총 시도 × 100. 시도 횟수 기준 클리어 확률">
-                                        클리어 확률 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="총 시도 ÷ 유니크 사용자. 사용자당 평균 게임 횟수">
-                                        평균 시도 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="자발적으로 게임을 종료(voluntary_exit)한 유니크 사용자 수">
-                                        자발적 종료 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 cursor-help" title="반복 플레이(is_repeat_play=true)로 기록된 유니크 사용자 수">
-                                        반복 플레이 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 text-purple-300 cursor-help" title="정확히 1회만 부활하고 게임을 끝낸 게임 수">
-                                        부활 1회 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 text-purple-300 cursor-help" title="정확히 2회만 부활하고 게임을 끝낸 게임 수">
-                                        부활 2회 <span className="text-slate-500">ⓘ</span>
-                                    </th>
-                                    <th className="text-right p-2 text-purple-300 cursor-help" title="정확히 3회만 부활하고 게임을 끝낸 게임 수">
-                                        부활 3회 <span className="text-slate-500">ⓘ</span>
-                                    </th>
+                                    <TableHeaderTooltip label="유니크 사용자" description="해당 스테이지에 시도한 고유 사용자 수 (User ID 기준)" />
+                                    <TableHeaderTooltip label="총 시도" description="총 클리어 + 총 실패 횟수. 해당 스테이지의 모든 게임 결과 수" />
+                                    <TableHeaderTooltip label="총 클리어" description="클리어 이벤트 총 개수. 한 사용자가 여러 번 클리어할 수 있음" />
+                                    <TableHeaderTooltip label="클리어한 사용자" description="1회 이상 클리어한 유니크 사용자 수" />
+                                    <TableHeaderTooltip label="실패한 사용자" description="1회 이상 실패한 유니크 사용자 수 (클리어한 사용자와 중복 가능)" />
+                                    <TableHeaderTooltip label="통과율" description="클리어한 사용자 ÷ 유니크 사용자 × 100. 유저 기준 통과율" />
+                                    <TableHeaderTooltip label="클리어 확률" description="총 클리어 ÷ 총 시도 × 100. 시도 횟수 기준 클리어 확률" />
+                                    <TableHeaderTooltip label="평균 시도" description="총 시도 ÷ 유니크 사용자. 사용자당 평균 게임 횟수" />
+                                    <TableHeaderTooltip label="자발적 종료" description="자발적으로 게임을 종료(voluntary_exit)한 유니크 사용자 수" />
+                                    <TableHeaderTooltip label="반복 플레이" description="반복 플레이(is_repeat_play=true)로 기록된 유니크 사용자 수" />
+                                    <TableHeaderTooltip label="부활 1회" description="정확히 1회만 부활하고 게임을 끝낸 게임 수" className="text-purple-300" />
+                                    <TableHeaderTooltip label="부활 2회" description="정확히 2회만 부활하고 게임을 끝낸 게임 수" className="text-purple-300" />
+                                    <TableHeaderTooltip label="부활 3회" description="정확히 3회만 부활하고 게임을 끝낸 게임 수" className="text-purple-300" />
                                 </tr>
                             </thead>
                             <tbody className="text-slate-300">
