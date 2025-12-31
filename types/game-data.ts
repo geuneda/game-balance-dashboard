@@ -71,7 +71,8 @@ export interface UserStageStats {
 export type StageType = "all" | "normal" | "elite" | "luck" | "mass";
 
 export interface FilterOptions {
-    excludeVoluntaryExits: boolean;
+    excludeVoluntaryExitsLowLevel: boolean;
+    excludeVoluntaryExitsHighLevel: boolean;
     excludeRepeatPlays: boolean;
     stageType: StageType;
     selectedCountries: string[];

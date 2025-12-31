@@ -99,12 +99,27 @@ export function filterEvents(
 ): GameEvent[] {
     let filtered = [...events];
 
-    // Filter out voluntary exits
-    if (options.excludeVoluntaryExits) {
+    // Filter out voluntary exits (Low Level: 0-9)
+    if (options.excludeVoluntaryExitsLowLevel) {
         filtered = filtered.filter((event) => {
             if (
                 isFailEvent(event) &&
-                event.customEventProperties.exit_type === "voluntary_exit"
+                event.customEventProperties.exit_type === "voluntary_exit" &&
+                event.customEventProperties.last_level <= 9
+            ) {
+                return false;
+            }
+            return true;
+        });
+    }
+
+    // Filter out voluntary exits (High Level: 10+)
+    if (options.excludeVoluntaryExitsHighLevel) {
+        filtered = filtered.filter((event) => {
+            if (
+                isFailEvent(event) &&
+                event.customEventProperties.exit_type === "voluntary_exit" &&
+                event.customEventProperties.last_level >= 10
             ) {
                 return false;
             }

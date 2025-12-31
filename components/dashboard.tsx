@@ -37,7 +37,8 @@ export default function Dashboard() {
   const [reviveData, setReviveData] = useState<ReviveEvent[]>([]);
   const [fileName, setFileName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [excludeVoluntaryExits, setExcludeVoluntaryExits] = useState(false);
+  const [excludeVoluntaryExitsLowLevel, setExcludeVoluntaryExitsLowLevel] = useState(false);
+  const [excludeVoluntaryExitsHighLevel, setExcludeVoluntaryExitsHighLevel] = useState(false);
   const [excludeRepeatPlays, setExcludeRepeatPlays] = useState(false);
   const [stageType, setStageType] = useState<StageType>('all');
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
@@ -408,7 +409,8 @@ export default function Dashboard() {
 
   // Create filter options
   const filterOptions: FilterOptions = {
-    excludeVoluntaryExits,
+    excludeVoluntaryExitsLowLevel,
+    excludeVoluntaryExitsHighLevel,
     excludeRepeatPlays,
     stageType,
     selectedCountries
@@ -466,27 +468,53 @@ export default function Dashboard() {
                 <h3 className="font-semibold">필터 설정</h3>
               </div>
 
-              {/* Voluntary Exit Filter */}
+              {/* Voluntary Exit Filter (Low Level) */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div>
                     <p className="text-sm font-medium text-white">
-                      자발적 포기 데이터 제외
+                      자발적 포기 데이터 제외 (저레벨)
                     </p>
                     <p className="text-xs text-slate-400">
-                      voluntary_exit 데이터를 분석에서 제외합니다
+                      voluntary_exit (last_level 0~9) 제외
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setExcludeVoluntaryExits(!excludeVoluntaryExits)}
+                  onClick={() => setExcludeVoluntaryExitsLowLevel(!excludeVoluntaryExitsLowLevel)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    excludeVoluntaryExits ? 'bg-blue-600' : 'bg-slate-600'
+                    excludeVoluntaryExitsLowLevel ? 'bg-blue-600' : 'bg-slate-600'
                   }`}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      excludeVoluntaryExits ? 'translate-x-6' : 'translate-x-1'
+                      excludeVoluntaryExitsLowLevel ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Voluntary Exit Filter (High Level) */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      자발적 포기 데이터 제외 (고레벨)
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      voluntary_exit (last_level 10+) 제외
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setExcludeVoluntaryExitsHighLevel(!excludeVoluntaryExitsHighLevel)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    excludeVoluntaryExitsHighLevel ? 'bg-blue-600' : 'bg-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      excludeVoluntaryExitsHighLevel ? 'translate-x-6' : 'translate-x-1'
                     }`}
                   />
                 </button>
@@ -609,12 +637,15 @@ export default function Dashboard() {
               </div>
 
               {/* Filter Status Message */}
-              {(excludeVoluntaryExits || excludeRepeatPlays || stageType !== 'all' || selectedCountries.length > 0) && (
+              {(excludeVoluntaryExitsLowLevel || excludeVoluntaryExitsHighLevel || excludeRepeatPlays || stageType !== 'all' || selectedCountries.length > 0) && (
                 <div className="mt-3 p-2 bg-blue-900/30 border border-blue-700/50 rounded text-xs text-blue-300">
                   <div className="space-y-1">
                     <p>ⓘ 필터 적용 중:</p>
-                    {excludeVoluntaryExits && (
-                      <p>• 자발적 포기: {gameData.filter(e => e.eventAction === 'fail' && e.customEventProperties.exit_type === 'voluntary_exit').length}개 제외</p>
+                    {excludeVoluntaryExitsLowLevel && (
+                      <p>• 자발적 포기(저레벨): {gameData.filter(e => e.eventAction === 'fail' && e.customEventProperties.exit_type === 'voluntary_exit' && e.customEventProperties.last_level <= 9).length}개 제외</p>
+                    )}
+                    {excludeVoluntaryExitsHighLevel && (
+                      <p>• 자발적 포기(고레벨): {gameData.filter(e => e.eventAction === 'fail' && e.customEventProperties.exit_type === 'voluntary_exit' && e.customEventProperties.last_level >= 10).length}개 제외</p>
                     )}
                     {excludeRepeatPlays && (
                       <p>• 반복 플레이: {gameData.filter(e => e.customEventProperties.is_repeat_play === true).length}개 제외</p>
