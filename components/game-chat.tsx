@@ -75,7 +75,61 @@ export function GameChat({ defaultNickname = "" }: GameChatProps) {
         loadMessages();
     }, []);
 
-    // Realtime 구독
+    // 메시지 Realtime 구독 (닉네임 설정과 무관하게 항상 구독)
+    useEffect(() => {
+        if (!supabase) return;
+
+        // 메시지 채널 (새 메시지 실시간 수신)
+        const messageChannel = supabase
+            .channel(`chat:${CHAT_ROOM}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "chat_messages",
+                    filter: `room=eq.${CHAT_ROOM}`,
+                },
+                (payload) => {
+                    const newMsg = payload.new as ChatMessage;
+                    setMessages((prev) => {
+                        // 중복 방지 (optimistic update와 realtime 중복)
+                        if (prev.some((m) => m.id === newMsg.id)) {
+                            return prev;
+                        }
+                        // temp 메시지가 있으면 교체
+                        const tempIndex = prev.findIndex(
+                            (m) =>
+                                m.id.startsWith("temp-") &&
+                                m.nickname === newMsg.nickname &&
+                                m.message === newMsg.message,
+                        );
+                        if (tempIndex !== -1) {
+                            const updated = [...prev];
+                            updated[tempIndex] = newMsg;
+                            return updated;
+                        }
+                        const updated = [...prev, newMsg];
+                        // 최대 메시지 수 유지
+                        if (updated.length > MAX_MESSAGES) {
+                            return updated.slice(-MAX_MESSAGES);
+                        }
+                        return updated;
+                    });
+                },
+            )
+            .subscribe((status) => {
+                console.log("Chat channel status:", status);
+            });
+
+        channelRef.current = messageChannel;
+
+        return () => {
+            messageChannel.unsubscribe();
+        };
+    }, []);
+
+    // Presence 구독 (닉네임 설정 후)
     useEffect(() => {
         if (!supabase || !isNicknameSet) return;
 
@@ -103,40 +157,8 @@ export function GameChat({ defaultNickname = "" }: GameChatProps) {
                 }
             });
 
-        // 메시지 채널 (새 메시지 실시간 수신)
-        const messageChannel = supabase
-            .channel(`chat:${CHAT_ROOM}`)
-            .on(
-                "postgres_changes",
-                {
-                    event: "INSERT",
-                    schema: "public",
-                    table: "chat_messages",
-                    filter: `room=eq.${CHAT_ROOM}`,
-                },
-                (payload) => {
-                    const newMsg = payload.new as ChatMessage;
-                    setMessages((prev) => {
-                        // 중복 방지
-                        if (prev.some((m) => m.id === newMsg.id)) {
-                            return prev;
-                        }
-                        const updated = [...prev, newMsg];
-                        // 최대 메시지 수 유지
-                        if (updated.length > MAX_MESSAGES) {
-                            return updated.slice(-MAX_MESSAGES);
-                        }
-                        return updated;
-                    });
-                },
-            )
-            .subscribe();
-
-        channelRef.current = messageChannel;
-
         return () => {
             presenceChannel.unsubscribe();
-            messageChannel.unsubscribe();
         };
     }, [isNicknameSet, nickname]);
 
@@ -145,6 +167,16 @@ export function GameChat({ defaultNickname = "" }: GameChatProps) {
         if (!newMessage.trim() || !supabase || !isNicknameSet) return;
 
         const messageToSend = newMessage.trim();
+        const tempId = `temp-${Date.now()}`;
+
+        // Optimistic Update: 즉시 로컬에 메시지 추가
+        const tempMessage: ChatMessage = {
+            id: tempId,
+            nickname,
+            message: messageToSend,
+            created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, tempMessage]);
         setNewMessage("");
 
         try {
@@ -156,10 +188,13 @@ export function GameChat({ defaultNickname = "" }: GameChatProps) {
 
             if (error) {
                 console.error("Failed to send message:", error);
-                setNewMessage(messageToSend); // 실패 시 복원
+                // 실패 시 temp 메시지 제거하고 입력 복원
+                setMessages((prev) => prev.filter((m) => m.id !== tempId));
+                setNewMessage(messageToSend);
             }
         } catch (e) {
             console.error("Error sending message:", e);
+            setMessages((prev) => prev.filter((m) => m.id !== tempId));
             setNewMessage(messageToSend);
         }
     }, [newMessage, nickname, isNicknameSet]);
