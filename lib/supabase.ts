@@ -35,3 +35,11 @@ export interface GameRoomRow {
     created_at: string;
     updated_at: string;
 }
+
+export interface ChatMessageRow {
+    id: string;
+    nickname: string;
+    message: string;
+    room: string;
+    created_at: string;
+}
