@@ -110,3 +110,13 @@ export interface StageReviveStats {
     reviveTypeDistribution: Record<string, number>; // 부활 타입별 분포
     averageRevivePerGame: number; // 게임당 평균 부활 횟수
 }
+
+// 부활 그룹 타입 (게임 세션 내 최대 부활 횟수 기준)
+export type ReviveGroup = "all" | "0" | "1" | "2plus";
+
+// 유저별 부활 그룹 정보
+export interface UserReviveGroup {
+    userId: string;
+    maxReviveCount: number; // 해당 유저의 최대 부활 횟수
+    reviveGroup: ReviveGroup;
+}

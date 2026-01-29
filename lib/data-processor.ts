@@ -12,6 +12,7 @@ import {
     ReviveEvent,
     StageReviveStats,
     ReviveCountDistribution,
+    ReviveGroup,
 } from "@/types/game-data";
 
 /**
@@ -95,7 +96,7 @@ export function formatStageId(stageId: string): string {
  */
 export function filterEvents(
     events: GameEvent[],
-    options: FilterOptions
+    options: FilterOptions,
 ): GameEvent[] {
     let filtered = [...events];
 
@@ -179,10 +180,10 @@ export function calculateStageStats(events: GameEvent[]): StageStats[] {
         const voluntaryExits = stageEvents.filter(
             (e) =>
                 isFailEvent(e) &&
-                e.customEventProperties.exit_type === "voluntary_exit"
+                e.customEventProperties.exit_type === "voluntary_exit",
         ).length;
         const repeatPlays = stageEvents.filter(
-            (e) => e.customEventProperties.is_repeat_play === true
+            (e) => e.customEventProperties.is_repeat_play === true,
         ).length;
 
         // Fallback: if 'try' events are missing or inconsistent, use clears + fails
@@ -303,11 +304,11 @@ export function calculateFunnelData(events: GameEvent[]): FunnelData[] {
 }
 
 export function calculateStageAttrition(
-    stats: StageStats[]
+    stats: StageStats[],
 ): StageAttritionData[] {
     // 스테이지를 정렬하고 이탈률 계산
     const sortedStats = [...stats].sort((a, b) =>
-        a.stageId.localeCompare(b.stageId)
+        a.stageId.localeCompare(b.stageId),
     );
 
     return sortedStats.map((stage, index) => {
@@ -340,7 +341,7 @@ export function calculateStageAttrition(
  */
 export function calculateStageSpecificFunnelData(
     events: GameEvent[],
-    stageId: string
+    stageId: string,
 ): FunnelData[] {
     const stageEvents = events.filter((e) => e.eventLabel === stageId);
     return calculateFunnelData(stageEvents);
@@ -367,7 +368,7 @@ export function getStageIds(events: GameEvent[]): string[] {
  * Get unique countries from events, sorted by event count (most frequent first)
  */
 export function getCountries(
-    events: GameEvent[]
+    events: GameEvent[],
 ): Array<{ code: string; name: string; count: number }> {
     const countryMap = new Map<string, { name: string; count: number }>();
 
@@ -395,7 +396,7 @@ export function getVoluntaryExitRate(events: GameEvent[]): number {
     const voluntaryExits = events.filter(
         (e) =>
             isFailEvent(e) &&
-            e.customEventProperties.exit_type === "voluntary_exit"
+            e.customEventProperties.exit_type === "voluntary_exit",
     ).length;
 
     return fails > 0 ? (voluntaryExits / fails) * 100 : 0;
@@ -417,7 +418,7 @@ export function getOverallClearRate(events: GameEvent[]): number {
  * This shows real player drop-off rather than just attempt counts
  */
 export function calculateUserAttrition(
-    events: GameEvent[]
+    events: GameEvent[],
 ): UserAttritionData[] {
     // Group events by stage
     const stageMap = new Map<string, Set<string>>();
@@ -434,7 +435,7 @@ export function calculateUserAttrition(
 
     // Sort stages
     const sortedStages = Array.from(stageMap.entries()).sort((a, b) =>
-        a[0].localeCompare(b[0])
+        a[0].localeCompare(b[0]),
     );
 
     const result: UserAttritionData[] = [];
@@ -626,7 +627,7 @@ export function isFirstClearEvent(event: GameEvent): boolean {
  */
 export function calculateFirstClearByTryCount(
     events: GameEvent[],
-    stageId: string
+    stageId: string,
 ): FirstClearStageData {
     // Filter events for the specific stage
     const stageEvents = events.filter((e) => e.eventLabel === stageId);
@@ -660,7 +661,7 @@ export function calculateFirstClearByTryCount(
 
         tryCountMap.set(
             actualTryCount,
-            (tryCountMap.get(actualTryCount) || 0) + 1
+            (tryCountMap.get(actualTryCount) || 0) + 1,
         );
     });
 
@@ -680,11 +681,11 @@ export function calculateFirstClearByTryCount(
  * Calculate first clear statistics for all stages
  */
 export function calculateAllFirstClearStats(
-    events: GameEvent[]
+    events: GameEvent[],
 ): FirstClearStageData[] {
     const stageIds = getStageIds(events);
     return stageIds.map((stageId) =>
-        calculateFirstClearByTryCount(events, stageId)
+        calculateFirstClearByTryCount(events, stageId),
     );
 }
 
@@ -731,7 +732,7 @@ export function parseReviveEvents(csvData: any[]): ReviveEvent[] {
  * Shows distribution of revive counts (1회, 2회, 3회...) per stage
  */
 export function calculateStageReviveStats(
-    reviveEvents: ReviveEvent[]
+    reviveEvents: ReviveEvent[],
 ): StageReviveStats[] {
     // Group revive events by stage
     const stageMap = new Map<string, ReviveEvent[]>();
@@ -763,14 +764,17 @@ export function calculateStageReviveStats(
             // Count events by revive_count
             reviveCountEventCount.set(
                 event.reviveCount,
-                (reviveCountEventCount.get(event.reviveCount) || 0) + 1
+                (reviveCountEventCount.get(event.reviveCount) || 0) + 1,
             );
         });
 
         // Calculate "exactly N revives" distribution
         // Games with exactly N revives = (games with at least N) - (games with at least N+1)
         // revive_count=N event count = games that reached Nth revive
-        const maxReviveCount = Math.max(...Array.from(reviveCountEventCount.keys()), 0);
+        const maxReviveCount = Math.max(
+            ...Array.from(reviveCountEventCount.keys()),
+            0,
+        );
         const reviveCountDistribution: ReviveCountDistribution[] = [];
 
         for (let n = 1; n <= maxReviveCount; n++) {
@@ -822,12 +826,15 @@ export function getOverallReviveStats(reviveEvents: ReviveEvent[]): {
     reviveEvents.forEach((event) => {
         reviveCountEventCount.set(
             event.reviveCount,
-            (reviveCountEventCount.get(event.reviveCount) || 0) + 1
+            (reviveCountEventCount.get(event.reviveCount) || 0) + 1,
         );
     });
 
     // Calculate "exactly N revives" distribution
-    const maxReviveCount = Math.max(...Array.from(reviveCountEventCount.keys()), 0);
+    const maxReviveCount = Math.max(
+        ...Array.from(reviveCountEventCount.keys()),
+        0,
+    );
     const reviveCountDistribution: ReviveCountDistribution[] = [];
 
     for (let n = 1; n <= maxReviveCount; n++) {
@@ -847,9 +854,7 @@ export function getOverallReviveStats(reviveEvents: ReviveEvent[]): {
     const totalGamesWithRevive = reviveCountEventCount.get(1) || 0;
     const totalReviveEvents = reviveEvents.length;
     const averageRevivePerGame =
-        totalGamesWithRevive > 0
-            ? totalReviveEvents / totalGamesWithRevive
-            : 0;
+        totalGamesWithRevive > 0 ? totalReviveEvents / totalGamesWithRevive : 0;
 
     return {
         totalReviveEvents,
@@ -857,4 +862,151 @@ export function getOverallReviveStats(reviveEvents: ReviveEvent[]): {
         averageRevivePerGame,
         reviveCountDistribution,
     };
+}
+
+/**
+ * Group users by their maximum revive count
+ * Returns a Map where key is userId and value is the maximum revive_count observed for that user
+ * Users without any revive events will not be in this map (they are considered as revive 0)
+ */
+export function groupUsersByReviveCount(
+    reviveEvents: ReviveEvent[],
+): Map<string, number> {
+    const userMaxReviveCount = new Map<string, number>();
+
+    reviveEvents.forEach((event) => {
+        if (!event.userId) return;
+
+        const currentMax = userMaxReviveCount.get(event.userId) || 0;
+        if (event.reviveCount > currentMax) {
+            userMaxReviveCount.set(event.userId, event.reviveCount);
+        }
+    });
+
+    return userMaxReviveCount;
+}
+
+/**
+ * Get users belonging to a specific revive group
+ * @param events - All game events (to get the list of all users)
+ * @param reviveEvents - Revive events
+ * @param reviveGroup - The revive group to filter by
+ * @returns Set of user IDs belonging to the specified group
+ */
+export function getUsersByReviveGroup(
+    events: GameEvent[],
+    reviveEvents: ReviveEvent[],
+    reviveGroup: ReviveGroup,
+): Set<string> {
+    if (reviveGroup === "all") {
+        // Return all users
+        const allUsers = new Set<string>();
+        events.forEach((event) => {
+            if (event.userId) {
+                allUsers.add(event.userId);
+            }
+        });
+        return allUsers;
+    }
+
+    const userMaxReviveCount = groupUsersByReviveCount(reviveEvents);
+    const filteredUsers = new Set<string>();
+
+    // Get all users from events first
+    const allUsers = new Set<string>();
+    events.forEach((event) => {
+        if (event.userId) {
+            allUsers.add(event.userId);
+        }
+    });
+
+    allUsers.forEach((userId) => {
+        const maxRevive = userMaxReviveCount.get(userId) || 0;
+
+        switch (reviveGroup) {
+            case "0":
+                if (maxRevive === 0) {
+                    filteredUsers.add(userId);
+                }
+                break;
+            case "1":
+                if (maxRevive === 1) {
+                    filteredUsers.add(userId);
+                }
+                break;
+            case "2plus":
+                if (maxRevive >= 2) {
+                    filteredUsers.add(userId);
+                }
+                break;
+        }
+    });
+
+    return filteredUsers;
+}
+
+/**
+ * Calculate user-based stage statistics filtered by revive group
+ * Shows statistics only for users belonging to the specified revive group
+ */
+export function calculateUserStageStatsByReviveGroup(
+    events: GameEvent[],
+    reviveEvents: ReviveEvent[],
+    reviveGroup: ReviveGroup,
+): UserStageStats[] {
+    // If "all", just return regular stats
+    if (reviveGroup === "all") {
+        return calculateUserStageStats(events);
+    }
+
+    // Get users in the specified revive group
+    const groupUsers = getUsersByReviveGroup(events, reviveEvents, reviveGroup);
+
+    // Filter events to only include users in the group
+    const filteredEvents = events.filter(
+        (event) => event.userId && groupUsers.has(event.userId),
+    );
+
+    // Calculate stats on filtered events
+    return calculateUserStageStats(filteredEvents);
+}
+
+/**
+ * Get revive group distribution summary
+ * Returns the count of users in each revive group
+ */
+export function getReviveGroupDistribution(
+    events: GameEvent[],
+    reviveEvents: ReviveEvent[],
+): { group: ReviveGroup; label: string; userCount: number }[] {
+    const allUsers = new Set<string>();
+    events.forEach((event) => {
+        if (event.userId) {
+            allUsers.add(event.userId);
+        }
+    });
+
+    const userMaxReviveCount = groupUsersByReviveCount(reviveEvents);
+
+    let revive0Count = 0;
+    let revive1Count = 0;
+    let revive2PlusCount = 0;
+
+    allUsers.forEach((userId) => {
+        const maxRevive = userMaxReviveCount.get(userId) || 0;
+        if (maxRevive === 0) {
+            revive0Count++;
+        } else if (maxRevive === 1) {
+            revive1Count++;
+        } else {
+            revive2PlusCount++;
+        }
+    });
+
+    return [
+        { group: "all", label: "전체", userCount: allUsers.size },
+        { group: "0", label: "부활 0회", userCount: revive0Count },
+        { group: "1", label: "부활 1회", userCount: revive1Count },
+        { group: "2plus", label: "부활 2회+", userCount: revive2PlusCount },
+    ];
 }

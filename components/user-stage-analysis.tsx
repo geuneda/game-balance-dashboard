@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import {
     Card,
     CardContent,
@@ -8,7 +9,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { TableHeaderTooltip } from "@/components/ui/info-tooltip";
-import { UserStageStats, StageReviveStats } from "@/types/game-data";
+import { UserStageStats, StageReviveStats, GameEvent, ReviveEvent, ReviveGroup } from "@/types/game-data";
 import {
     BarChart,
     Bar,
@@ -22,21 +23,42 @@ import {
     ResponsiveContainer,
     ComposedChart,
 } from "recharts";
-import { formatStageId } from "@/lib/data-processor";
+import { formatStageId, calculateUserStageStatsByReviveGroup, getReviveGroupDistribution } from "@/lib/data-processor";
 
 interface Props {
     data: UserStageStats[];
     reviveStats?: StageReviveStats[];
+    events?: GameEvent[];
+    reviveEvents?: ReviveEvent[];
 }
 
-export function UserStageAnalysis({ data, reviveStats = [] }: Props) {
+export function UserStageAnalysis({ data, reviveStats = [], events = [], reviveEvents = [] }: Props) {
+    const [selectedReviveGroup, setSelectedReviveGroup] = useState<ReviveGroup>("all");
+
+    // Check if revive events exist
+    const hasReviveData = reviveEvents.length > 0;
+
+    // Get revive group distribution for tab labels
+    const reviveGroupDistribution = useMemo(() => {
+        if (!hasReviveData || events.length === 0) return [];
+        return getReviveGroupDistribution(events, reviveEvents);
+    }, [events, reviveEvents, hasReviveData]);
+
+    // Calculate stats for the selected revive group
+    const filteredData = useMemo(() => {
+        if (!hasReviveData || selectedReviveGroup === "all" || events.length === 0) {
+            return data;
+        }
+        return calculateUserStageStatsByReviveGroup(events, reviveEvents, selectedReviveGroup);
+    }, [data, events, reviveEvents, selectedReviveGroup, hasReviveData]);
+
     // Create a map for quick revive stats lookup by stageId
     const reviveStatsMap = new Map<string, StageReviveStats>();
     reviveStats.forEach((stat) => {
         reviveStatsMap.set(stat.stageId, stat);
     });
     // 차트 데이터에 포맷팅된 스테이지 이름 추가
-    const chartData = data.map((stage) => ({
+    const chartData = filteredData.map((stage) => ({
         ...stage,
         formattedStageId: formatStageId(stage.stageId),
     }));
@@ -75,6 +97,51 @@ export function UserStageAnalysis({ data, reviveStats = [] }: Props) {
 
     return (
         <div className="space-y-6">
+            {/* Revive Group Sub-tabs */}
+            {hasReviveData && reviveGroupDistribution.length > 0 && (
+                <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
+                    <CardContent className="py-4">
+                        <div className="flex items-center gap-3 mb-3">
+                            <span className="text-sm font-medium text-slate-300">부활 횟수별 필터:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {reviveGroupDistribution.map((group) => (
+                                <button
+                                    key={group.group}
+                                    onClick={() => setSelectedReviveGroup(group.group)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        selectedReviveGroup === group.group
+                                            ? "bg-blue-600 text-white"
+                                            : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                                    }`}
+                                >
+                                    {group.label}
+                                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-slate-600/50">
+                                        {group.userCount.toLocaleString()}명
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                        {selectedReviveGroup !== "all" && (
+                            <p className="text-xs text-blue-400 mt-3">
+                                * 선택한 부활 그룹({reviveGroupDistribution.find(g => g.group === selectedReviveGroup)?.label})에 속한 유저들의 데이터만 표시됩니다.
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* No revive data message */}
+            {!hasReviveData && (
+                <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
+                    <CardContent className="py-4">
+                        <p className="text-sm text-slate-400">
+                            ⓘ 부활 데이터가 없는 데이터셋입니다. 부활 횟수별 필터는 부활 이벤트가 포함된 데이터에서만 사용할 수 있습니다.
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
