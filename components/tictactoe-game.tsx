@@ -93,6 +93,45 @@ export function TicTacToeGame() {
         loadRankings();
     }, []);
 
+    // 방 상태 폴링 (Realtime 백업용)
+    useEffect(() => {
+        if (!room?.room_code || gameState === "lobby" || gameState === "finished") return;
+
+        const pollRoom = async () => {
+            try {
+                const response = await fetch(`/api/games?code=${room.room_code}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.room) {
+                        const updatedRoom = data.room as GameRoom;
+                        
+                        // 상태가 변경되었을 때만 업데이트
+                        if (updatedRoom.status !== room.status || 
+                            updatedRoom.updated_at !== room.updated_at) {
+                            setRoom(updatedRoom);
+                            
+                            if (updatedRoom.status === "playing" && gameState === "waiting") {
+                                setGameState("playing");
+                            } else if (updatedRoom.status === "finished") {
+                                setGameState("finished");
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Polling error:", e);
+            }
+        };
+
+        // 2초마다 폴링
+        const interval = setInterval(pollRoom, 2000);
+        
+        // 즉시 한번 실행
+        pollRoom();
+
+        return () => clearInterval(interval);
+    }, [room?.room_code, room?.status, room?.updated_at, gameState]);
+
     // 게임 방 실시간 구독
     useEffect(() => {
         if (!room?.room_code || !supabase) return;
@@ -118,7 +157,9 @@ export function TicTacToeGame() {
                     }
                 },
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log("Realtime subscription status:", status);
+            });
 
         setChannel(newChannel);
 
