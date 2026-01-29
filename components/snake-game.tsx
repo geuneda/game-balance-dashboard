@@ -8,7 +8,6 @@ const INITIAL_SPEED = 150;
 const MIN_SPEED = 60;
 const SPEED_DECREASE_PER_FOOD = 5;
 const MAX_RANKINGS = 10;
-const STORAGE_KEY = "snake-game-rankings";
 
 type Position = { x: number; y: number };
 type Direction = "UP" | "DOWN" | "LEFT" | "RIGHT";
@@ -20,26 +19,48 @@ interface RankingEntry {
     date: string;
 }
 
-// 랭킹 관련 함수들
-function loadRankings(): RankingEntry[] {
-    if (typeof window === "undefined") return [];
+// API 기반 랭킹 함수들
+async function fetchRankings(): Promise<RankingEntry[]> {
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            return JSON.parse(stored);
+        const response = await fetch("/api/rankings");
+        if (!response.ok) {
+            console.error("Failed to fetch rankings:", response.status);
+            return [];
         }
-    } catch {
-        console.error("Failed to load rankings");
+        const data = await response.json();
+        return data.rankings || [];
+    } catch (error) {
+        console.error("Failed to fetch rankings:", error);
+        return [];
     }
-    return [];
 }
 
-function saveRankings(rankings: RankingEntry[]): void {
-    if (typeof window === "undefined") return;
+async function submitRanking(
+    nickname: string,
+    score: number,
+): Promise<{ rankings: RankingEntry[]; newRankPosition: number | null }> {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(rankings));
-    } catch {
-        console.error("Failed to save rankings");
+        const response = await fetch("/api/rankings", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ nickname, score }),
+        });
+
+        if (!response.ok) {
+            console.error("Failed to submit ranking:", response.status);
+            return { rankings: [], newRankPosition: null };
+        }
+
+        const data = await response.json();
+        return {
+            rankings: data.rankings || [],
+            newRankPosition: data.newRankPosition || null,
+        };
+    } catch (error) {
+        console.error("Failed to submit ranking:", error);
+        return { rankings: [], newRankPosition: null };
     }
 }
 
@@ -47,27 +68,6 @@ function isRankingEntry(score: number, rankings: RankingEntry[]): boolean {
     if (score === 0) return false;
     if (rankings.length < MAX_RANKINGS) return true;
     return score > rankings[rankings.length - 1].score;
-}
-
-function addToRanking(
-    nickname: string,
-    score: number,
-    rankings: RankingEntry[],
-): RankingEntry[] {
-    const newEntry: RankingEntry = {
-        rank: 0,
-        nickname: nickname.trim() || "익명",
-        score,
-        date: new Date().toLocaleDateString("ko-KR"),
-    };
-
-    const newRankings = [...rankings, newEntry]
-        .sort((a, b) => b.score - a.score)
-        .slice(0, MAX_RANKINGS)
-        .map((entry, index) => ({ ...entry, rank: index + 1 }));
-
-    saveRankings(newRankings);
-    return newRankings;
 }
 
 // 속도 계산 함수
@@ -100,10 +100,18 @@ export function SnakeGame() {
     const animationFrameRef = useRef<number | null>(null);
     const gameContainerRef = useRef<HTMLDivElement>(null);
     const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+    const [isLoadingRankings, setIsLoadingRankings] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // 랭킹 로드
+    // 랭킹 로드 (서버에서)
     useEffect(() => {
-        setRankings(loadRankings());
+        const loadRankings = async () => {
+            setIsLoadingRankings(true);
+            const data = await fetchRankings();
+            setRankings(data);
+            setIsLoadingRankings(false);
+        };
+        loadRankings();
     }, []);
 
     const generateFood = useCallback((currentSnake: Position[]): Position => {
@@ -138,22 +146,25 @@ export function SnakeGame() {
     // 게임 오버 시 랭킹 체크
     useEffect(() => {
         if (gameOver && score > 0) {
-            const currentRankings = loadRankings();
-            if (isRankingEntry(score, currentRankings)) {
+            if (isRankingEntry(score, rankings)) {
                 setShowNicknameInput(true);
             }
         }
-    }, [gameOver, score]);
+    }, [gameOver, score, rankings]);
 
-    // 닉네임 제출 핸들러
-    const handleNicknameSubmit = useCallback(() => {
-        const currentRankings = loadRankings();
-        const newRankings = addToRanking(nickname, score, currentRankings);
-        setRankings(newRankings);
-        const position = newRankings.findIndex((r) => r.score === score);
-        setNewRankPosition(position !== -1 ? position + 1 : null);
+    // 닉네임 제출 핸들러 (서버에 저장)
+    const handleNicknameSubmit = useCallback(async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+
+        const result = await submitRanking(nickname, score);
+        if (result.rankings.length > 0) {
+            setRankings(result.rankings);
+            setNewRankPosition(result.newRankPosition);
+        }
         setShowNicknameInput(false);
-    }, [nickname, score]);
+        setIsSubmitting(false);
+    }, [nickname, score, isSubmitting]);
 
     const moveSnake = useCallback(
         (currentSnake: Position[], currentFood: Position) => {
@@ -467,19 +478,28 @@ export function SnakeGame() {
                                             )
                                         }
                                         onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
+                                            if (
+                                                e.key === "Enter" &&
+                                                !isSubmitting
+                                            ) {
                                                 handleNicknameSubmit();
                                             }
                                         }}
                                         placeholder="닉네임 (최대 10자)"
                                         className="px-3 py-2 rounded bg-white text-black mb-3 w-40 text-center"
                                         autoFocus
+                                        disabled={isSubmitting}
                                     />
                                     <button
                                         onClick={handleNicknameSubmit}
-                                        className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded font-bold"
+                                        disabled={isSubmitting}
+                                        className={`px-4 py-2 rounded font-bold ${
+                                            isSubmitting
+                                                ? "bg-gray-400 cursor-not-allowed"
+                                                : "bg-yellow-500 hover:bg-yellow-600"
+                                        } text-black`}
                                     >
-                                        등록
+                                        {isSubmitting ? "저장 중..." : "등록"}
                                     </button>
                                 </>
                             ) : (
@@ -528,9 +548,11 @@ export function SnakeGame() {
             {/* 랭킹 보드 */}
             <div className="bg-gray-800 rounded-lg p-4 min-w-[200px]">
                 <h3 className="text-yellow-400 font-bold text-lg mb-3 flex items-center gap-2">
-                    <span>🏆</span> 랭킹 TOP 10
+                    <span>🏆</span> 전체 랭킹 TOP 10
                 </h3>
-                {rankings.length === 0 ? (
+                {isLoadingRankings ? (
+                    <p className="text-gray-400 text-sm">랭킹 불러오는 중...</p>
+                ) : rankings.length === 0 ? (
                     <p className="text-gray-400 text-sm">
                         아직 기록이 없습니다
                     </p>
@@ -572,7 +594,7 @@ export function SnakeGame() {
                 )}
                 <div className="mt-4 pt-3 border-t border-gray-600">
                     <p className="text-gray-400 text-xs">
-                        기록: {rankings.length}/{MAX_RANKINGS}
+                        전체 유저 TOP {MAX_RANKINGS}
                     </p>
                 </div>
             </div>
