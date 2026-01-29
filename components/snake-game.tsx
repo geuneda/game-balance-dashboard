@@ -472,7 +472,7 @@ export function SnakeGame() {
                                             }
                                         }}
                                         placeholder="닉네임 (최대 10자)"
-                                        className="px-3 py-2 rounded text-black mb-3 w-40 text-center"
+                                        className="px-3 py-2 rounded bg-white text-black mb-3 w-40 text-center"
                                         autoFocus
                                     />
                                     <button
