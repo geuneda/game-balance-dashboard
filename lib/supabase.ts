@@ -19,5 +19,19 @@ export interface RankingRow {
     id: number;
     nickname: string;
     score: number;
+    game_type: string;
     created_at: string;
+}
+
+export interface GameRoomRow {
+    id: string;
+    room_code: string;
+    player_x: string;
+    player_o: string | null;
+    board: (string | null)[];
+    current_turn: string;
+    winner: string | null;
+    status: "waiting" | "playing" | "finished";
+    created_at: string;
+    updated_at: string;
 }

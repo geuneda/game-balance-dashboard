@@ -19,10 +19,12 @@ interface RankingEntry {
     date: string;
 }
 
+const GAME_TYPE = "snake";
+
 // API 기반 랭킹 함수들
 async function fetchRankings(): Promise<RankingEntry[]> {
     try {
-        const response = await fetch("/api/rankings");
+        const response = await fetch(`/api/rankings?game_type=${GAME_TYPE}`);
         if (!response.ok) {
             console.error("Failed to fetch rankings:", response.status);
             return [];
@@ -45,7 +47,7 @@ async function submitRanking(
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ nickname, score }),
+            body: JSON.stringify({ nickname, score, game_type: GAME_TYPE }),
         });
 
         if (!response.ok) {

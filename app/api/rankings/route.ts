@@ -11,7 +11,7 @@ export interface RankingEntry {
 }
 
 // GET: 랭킹 목록 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
     if (!isSupabaseConfigured || !supabase) {
         return NextResponse.json(
             { error: "Database not configured", rankings: [] },
@@ -20,9 +20,14 @@ export async function GET() {
     }
 
     try {
+        // game_type 파라미터 추출 (기본값: snake)
+        const { searchParams } = new URL(request.url);
+        const gameType = searchParams.get("game_type") || "snake";
+
         const { data, error } = await supabase
             .from("rankings")
             .select("*")
+            .eq("game_type", gameType)
             .order("score", { ascending: false })
             .limit(MAX_RANKINGS);
 
@@ -64,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { nickname, score } = body;
+        const { nickname, score, game_type = "snake" } = body;
 
         // 유효성 검사
         if (typeof nickname !== "string" || typeof score !== "number") {
@@ -83,10 +88,11 @@ export async function POST(request: NextRequest) {
 
         const trimmedNickname = nickname.trim().slice(0, 10) || "익명";
 
-        // 현재 최저 랭킹 점수 확인
+        // 현재 최저 랭킹 점수 확인 (해당 게임 타입만)
         const { data: currentRankings, error: fetchError } = await supabase
             .from("rankings")
             .select("score")
+            .eq("game_type", game_type)
             .order("score", { ascending: false })
             .limit(MAX_RANKINGS);
 
@@ -113,10 +119,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 새 기록 추가
+        // 새 기록 추가 (game_type 포함)
         const { error: insertError } = await supabase.from("rankings").insert({
             nickname: trimmedNickname,
             score: score,
+            game_type: game_type,
         });
 
         if (insertError) {
@@ -127,12 +134,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 랭킹이 MAX_RANKINGS를 초과하면 가장 낮은 점수 삭제
+        // 해당 게임 타입의 랭킹이 MAX_RANKINGS를 초과하면 가장 낮은 점수 삭제
         if (currentRankings.length >= MAX_RANKINGS) {
             // 현재 TOP 10 + 새로 추가된 것 중에서 11위 이하 삭제
             const { data: allRankings, error: allError } = await supabase
                 .from("rankings")
                 .select("id, score")
+                .eq("game_type", game_type)
                 .order("score", { ascending: false });
 
             if (!allError && allRankings && allRankings.length > MAX_RANKINGS) {
@@ -148,6 +156,7 @@ export async function POST(request: NextRequest) {
         const { data: updatedRankings, error: updateError } = await supabase
             .from("rankings")
             .select("*")
+            .eq("game_type", game_type)
             .order("score", { ascending: false })
             .limit(MAX_RANKINGS);
 
