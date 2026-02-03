@@ -160,22 +160,36 @@ export default function Home() {
         }
     };
 
-    // No data loaded - show upload screen
+    // No data loaded - show upload screen with version switcher
     if (gameData.length === 0) {
         if (version === "v2") {
             return (
-                <DropzoneV2
-                    onFileSelect={parseFile}
-                    onLoadSample={loadSampleData}
-                    isLoading={isLoading}
-                    availableFiles={availableFiles}
-                    onSelectFile={(file) => loadDataFile(file.filePath, file.displayName)}
-                    onDeleteFile={handleDeleteFile}
-                />
+                <div className="relative">
+                    <FloatingVersionSwitcher
+                        version={version}
+                        onVersionChange={handleVersionChange}
+                    />
+                    <DropzoneV2
+                        onFileSelect={parseFile}
+                        onLoadSample={loadSampleData}
+                        isLoading={isLoading}
+                        availableFiles={availableFiles}
+                        onSelectFile={(file) => loadDataFile(file.filePath, file.displayName)}
+                        onDeleteFile={handleDeleteFile}
+                    />
+                </div>
             );
         }
         // V1 uses its own upload screen inside Dashboard component
-        return <Dashboard />;
+        return (
+            <div className="relative">
+                <FloatingVersionSwitcher
+                    version={version}
+                    onVersionChange={handleVersionChange}
+                />
+                <Dashboard />
+            </div>
+        );
     }
 
     // Data loaded - show dashboard
@@ -201,6 +215,42 @@ export default function Home() {
     );
 }
 
+// Floating version switcher component
+function FloatingVersionSwitcher({
+    version,
+    onVersionChange,
+}: {
+    version: "v1" | "v2";
+    onVersionChange: (v: "v1" | "v2") => void;
+}) {
+    return (
+        <div className="fixed top-4 right-4 z-50">
+            <div className="flex items-center bg-slate-800/90 backdrop-blur-sm rounded-full p-1 border border-slate-700 shadow-lg">
+                <button
+                    onClick={() => onVersionChange("v1")}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                        version === "v1"
+                            ? "bg-blue-600 text-white"
+                            : "text-slate-400 hover:text-white"
+                    }`}
+                >
+                    v1
+                </button>
+                <button
+                    onClick={() => onVersionChange("v2")}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                        version === "v2"
+                            ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                            : "text-slate-400 hover:text-white"
+                    }`}
+                >
+                    v2
+                </button>
+            </div>
+        </div>
+    );
+}
+
 // Wrapper component to inject version switcher into v1 Dashboard
 function DashboardWithVersionSwitcher({
     version,
@@ -211,31 +261,7 @@ function DashboardWithVersionSwitcher({
 }) {
     return (
         <div className="relative">
-            {/* Version Switcher floating button */}
-            <div className="fixed top-4 right-4 z-50">
-                <div className="flex items-center bg-slate-800/90 backdrop-blur-sm rounded-full p-1 border border-slate-700 shadow-lg">
-                    <button
-                        onClick={() => onVersionChange("v1")}
-                        className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
-                            version === "v1"
-                                ? "bg-blue-600 text-white"
-                                : "text-slate-400 hover:text-white"
-                        }`}
-                    >
-                        v1
-                    </button>
-                    <button
-                        onClick={() => onVersionChange("v2")}
-                        className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
-                            version === "v2"
-                                ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
-                                : "text-slate-400 hover:text-white"
-                        }`}
-                    >
-                        v2
-                    </button>
-                </div>
-            </div>
+            <FloatingVersionSwitcher version={version} onVersionChange={onVersionChange} />
             <Dashboard />
         </div>
     );
