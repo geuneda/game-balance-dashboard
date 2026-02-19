@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Papa from "papaparse";
 import {
     GameEvent,
     FilterOptions,
@@ -23,6 +22,7 @@ import {
     parseReviveEvents,
     calculateStageReviveStats,
 } from "@/lib/data-processor";
+import { streamParseCSV } from "@/lib/csv-stream-parser";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -77,6 +77,7 @@ export default function Dashboard() {
     const [reviveData, setReviveData] = useState<ReviveEvent[]>([]);
     const [fileName, setFileName] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
+    const [progress, setProgress] = useState(0);
     const [excludeVoluntaryExitsLowLevel, setExcludeVoluntaryExitsLowLevel] =
         useState(false);
     const [excludeVoluntaryExitsHighLevel, setExcludeVoluntaryExitsHighLevel] =
@@ -200,72 +201,70 @@ export default function Dashboard() {
         }
     };
 
-    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
         setFileName(file.name);
         setIsLoading(true);
+        setProgress(0);
 
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                const events = parseCSVData(results.data);
-                const reviveEvents = parseReviveEvents(results.data);
-                setGameData(events);
-                setReviveData(reviveEvents);
-                setIsLoading(false);
-            },
-            error: (error) => {
-                console.error("Error parsing CSV:", error);
-                setIsLoading(false);
-            },
-        });
+        try {
+            const { rows } = await streamParseCSV(file, {
+                onProgress: setProgress,
+            });
+            const events = parseCSVData(rows);
+            const reviveEvents = parseReviveEvents(rows);
+            setGameData(events);
+            setReviveData(reviveEvents);
+        } catch (error) {
+            console.error("Error parsing CSV:", error);
+        } finally {
+            setIsLoading(false);
+            setProgress(0);
+        }
     };
 
-    const loadDataFile = (filePath: string, displayName: string) => {
+    const loadDataFile = async (filePath: string, displayName: string) => {
         setIsLoading(true);
-        fetch(filePath)
-            .then((response) => response.text())
-            .then((csvText) => {
-                Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        const events = parseCSVData(results.data);
-                        const reviveEvents = parseReviveEvents(results.data);
-                        setGameData(events);
-                        setReviveData(reviveEvents);
-                        setFileName(displayName);
-                        setIsLoading(false);
-                    },
-                });
-            })
-            .catch((error) => {
-                console.error("Error loading data file:", error);
-                setIsLoading(false);
-            });
+        setProgress(0);
+
+        try {
+            const response = await fetch(filePath);
+            const csvText = await response.text();
+            const { rows } = await streamParseCSV(csvText);
+            const events = parseCSVData(rows);
+            const reviveEvents = parseReviveEvents(rows);
+            setGameData(events);
+            setReviveData(reviveEvents);
+            setFileName(displayName);
+        } catch (error) {
+            console.error("Error loading data file:", error);
+        } finally {
+            setIsLoading(false);
+            setProgress(0);
+        }
     };
 
-    const loadSampleData = () => {
+    const loadSampleData = async () => {
         setIsLoading(true);
-        fetch("/sample_data.csv")
-            .then((response) => response.text())
-            .then((csvText) => {
-                Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        const events = parseCSVData(results.data);
-                        const reviveEvents = parseReviveEvents(results.data);
-                        setGameData(events);
-                        setReviveData(reviveEvents);
-                        setFileName("sample_data.csv");
-                        setIsLoading(false);
-                    },
-                });
-            });
+        setProgress(0);
+
+        try {
+            const response = await fetch("/sample_data.csv");
+            const csvText = await response.text();
+            const { rows } = await streamParseCSV(csvText);
+            const events = parseCSVData(rows);
+            const reviveEvents = parseReviveEvents(rows);
+            setGameData(events);
+            setReviveData(reviveEvents);
+            setFileName("sample_data.csv");
+        } catch (error) {
+            console.error("Error loading sample data:", error);
+        } finally {
+            setIsLoading(false);
+            setProgress(0);
+        }
     };
 
     if (gameData.length === 0) {
@@ -488,6 +487,20 @@ export default function Dashboard() {
                                     ? "로딩 중..."
                                     : "샘플 데이터로 시작하기"}
                             </Button>
+
+                            {isLoading && progress > 0 && (
+                                <div className="w-full mt-4">
+                                    <div className="w-full bg-slate-700 rounded-full h-2 mb-1">
+                                        <div
+                                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${progress}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-slate-400 text-center">
+                                        처리 중... {progress}%
+                                    </p>
+                                </div>
+                            )}
 
                             <Button
                                 onClick={() => router.push("/tutorial")}

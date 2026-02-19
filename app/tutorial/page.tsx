@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Papa from 'papaparse';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, Home, Database } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { parseTutorialCSVData, TutorialEvent } from '@/lib/tutorial-processor';
+import { streamParseCSV } from '@/lib/csv-stream-parser';
 import { TutorialFunnelAnalysis } from '@/components/tutorial-funnel-analysis';
 
 interface DataFileInfo {
@@ -38,48 +38,39 @@ export default function TutorialPage() {
       .catch(error => console.error('Error fetching tutorial files:', error));
   }, []);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
     setIsLoading(true);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const parsedEvents = parseTutorialCSVData(results.data);
-        setEvents(parsedEvents);
-        setIsLoading(false);
-      },
-      error: (error) => {
-        console.error('CSV parsing error:', error);
-        setIsLoading(false);
-      }
-    });
+    try {
+      const { rows } = await streamParseCSV(file);
+      const parsedEvents = parseTutorialCSVData(rows);
+      setEvents(parsedEvents);
+    } catch (error) {
+      console.error('CSV parsing error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const loadDataFile = (filePath: string, displayName: string) => {
+  const loadDataFile = async (filePath: string, displayName: string) => {
     setIsLoading(true);
-    fetch(filePath)
-      .then(response => response.text())
-      .then(csvText => {
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            const parsedEvents = parseTutorialCSVData(results.data);
-            setEvents(parsedEvents);
-            setFileName(displayName);
-            setIsLoading(false);
-          }
-        });
-      })
-      .catch(error => {
-        console.error('Error loading data file:', error);
-        setIsLoading(false);
-      });
+
+    try {
+      const response = await fetch(filePath);
+      const csvText = await response.text();
+      const { rows } = await streamParseCSV(csvText);
+      const parsedEvents = parseTutorialCSVData(rows);
+      setEvents(parsedEvents);
+      setFileName(displayName);
+    } catch (error) {
+      console.error('Error loading data file:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

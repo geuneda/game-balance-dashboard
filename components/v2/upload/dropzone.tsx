@@ -19,6 +19,7 @@ interface DropzoneV2Props {
     onFileSelect: (file: File) => void;
     onLoadSample: () => void;
     isLoading: boolean;
+    progress?: number;
     availableFiles: DataFileInfo[];
     onSelectFile: (file: DataFileInfo) => void;
     onDeleteFile: (file: DataFileInfo) => void;
@@ -28,6 +29,7 @@ export function DropzoneV2({
     onFileSelect,
     onLoadSample,
     isLoading,
+    progress = 0,
     availableFiles,
     onSelectFile,
     onDeleteFile,
@@ -177,10 +179,26 @@ export function DropzoneV2({
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    className="flex flex-col items-center"
+                                    className="flex flex-col items-center w-full max-w-xs"
                                 >
                                     <Loader2 className="w-12 h-12 text-violet-400 animate-spin mb-4" />
-                                    <p className="text-slate-300">데이터 로딩 중...</p>
+                                    {progress > 0 ? (
+                                        <>
+                                            <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
+                                                <motion.div
+                                                    className="bg-gradient-to-r from-violet-500 to-purple-500 h-2 rounded-full"
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${progress}%` }}
+                                                    transition={{ duration: 0.3 }}
+                                                />
+                                            </div>
+                                            <p className="text-slate-300 text-sm">
+                                                처리 중... {progress}%
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <p className="text-slate-300">데이터 로딩 중...</p>
+                                    )}
                                 </motion.div>
                             ) : (
                                 <motion.div
